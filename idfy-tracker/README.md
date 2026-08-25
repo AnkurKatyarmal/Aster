@@ -94,13 +94,24 @@ them the link, and they're in with one click and no back-and-forth.
 
 You can cancel an unused invite at any time from the same page.
 
-> **On a fully public link:** this tracker holds real client names and
-> delivery detail, so there's no "no login at all" public mode — inviting
-> someone as Viewer keeps things secure while still being effectively
-> one-click for them (they just choose their Google account, no password).
-> If you specifically want a zero-login public status page later, that's a
-> separate feature (a curated, admin-published snapshot with only
-> high-level stats) — ask and it can be added.
+### Public dashboard link (no login required)
+
+**Settings → Public dashboard link** (admin only, cloud mode). Click
+**Publish current data**, then share the URL shown there — anyone can open
+it with zero login. It shows portfolio stats and each project's
+status/health/progress only. It deliberately does **not** include: owner
+emails, dependency descriptions, activity notes/impact text, the activity
+timeline, or the audit log — just enough for a leadership-level view.
+
+Nothing updates live on this page — click Publish again whenever you want
+the link to reflect the latest data. The link itself never changes, so you
+only need to share it once.
+
+This works by writing a curated snapshot to a Firestore document that's
+readable by anyone (no sign-in) but only writable by an admin — see
+`buildPublicSnapshot()` in `js/app.js` for exactly what goes into it, and
+the `publicSnapshots` rule in `firestore.rules` for how the "anyone can
+read, only admin can write" split is enforced.
 
 > **On notifications:** the admin (and members, for changes on their own
 > projects) sees a live badge on "Access Requests" / "Approvals" while the
@@ -171,6 +182,7 @@ no extra software needed.
 
 ```
 index.html
+public-dashboard.html      Standalone, no-login public dashboard (see below)
 firestore.rules            Firestore security rules (paste into Firebase console)
 css/
     styles.css              Design system incl. dark theme

@@ -276,6 +276,14 @@ var Auth = (function () {
     return db.collection("invites").doc(email.toLowerCase().trim()).delete();
   }
 
+  // ---- public dashboard snapshot (admin publishes, anyone can read) ----
+  function publishPublicSnapshot(data) {
+    return db.collection("publicSnapshots").doc("dashboard").set(Object.assign({}, data, {
+      generatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      generatedBy: currentUser ? currentUser.email : "unknown"
+    }));
+  }
+
   return {
     ROLES: ROLES,
     ROLE_LABELS: ROLE_LABELS,
@@ -300,6 +308,7 @@ var Auth = (function () {
     createInvite: createInvite,
     listInvites: listInvites,
     cancelInvite: cancelInvite,
+    publishPublicSnapshot: publishPublicSnapshot,
     getDb: function () { return db; }
   };
 })();

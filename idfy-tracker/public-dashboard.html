@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>IDfy Project Tracker — Public Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --navy: #11276D; --navy-700: #16308A; --navy-200: #DCE3F2; --navy-100: #EEF1F8; --navy-50: #F7F9FC;
+    --red: #CE1010; --red-bg: #FBEAEA; --grey: #6D6E71; --grey-100: #F4F4F5; --border: #E3E6EE;
+    --green: #1F8A4C; --green-bg: #E6F4EB; --amber: #A9720B; --amber-bg: #FBF3DF;
+    --purple: #5B4FCF; --purple-bg: #EEEDFB; --ink: #1A1D29; --ink-soft: #565A6E;
+    --mono: 'IBM Plex Mono', ui-monospace, monospace; --sans: 'Inter', -apple-system, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: var(--sans); color: var(--ink); background: var(--navy-50); font-size: 14px; }
+  .wrap { max-width: 1100px; margin: 0 auto; padding: 32px 24px 60px; }
+  .brand-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; }
+  .brand { font-weight: 700; font-size: 18px; color: var(--navy); }
+  .brand-sub { font-size: 12px; color: var(--ink-soft); }
+  .updated { font-size: 12px; color: var(--ink-soft); font-family: var(--mono); }
+  h1 { font-size: 22px; color: var(--navy); margin: 0 0 4px; }
+  .subtitle { color: var(--ink-soft); font-size: 13.5px; margin: 0 0 24px; }
+  .stat-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; margin-bottom: 30px; }
+  .stat-card { background: #fff; border: 1px solid var(--border); border-radius: 6px; padding: 14px 16px; }
+  .stat-value { font-size: 22px; font-weight: 700; color: var(--navy); font-family: var(--mono); }
+  .stat-label { font-size: 11px; color: var(--ink-soft); margin-top: 4px; text-transform: uppercase; }
+  .stat-green .stat-value { color: var(--green); } .stat-purple .stat-value { color: var(--purple); }
+  .stat-red .stat-value { color: var(--red); } .stat-amber .stat-value { color: var(--amber); }
+  .table-wrap { background: #fff; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+  table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  th { text-align: left; padding: 10px 14px; background: var(--navy-50); color: var(--navy); font-weight: 700; text-transform: uppercase; font-size: 10.5px; border-bottom: 1px solid var(--border); }
+  td { padding: 10px 14px; border-bottom: 1px solid var(--border); }
+  tr:last-child td { border-bottom: none; }
+  .badge { font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 20px; text-transform: uppercase; }
+  .badge-live { background: var(--green-bg); color: var(--green); } .badge-poc { background: var(--purple-bg); color: var(--purple); }
+  .health-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 5px; }
+  .dot-green { background: var(--green); } .dot-amber { background: var(--amber); } .dot-red { background: #E08A00; } .dot-red-solid { background: var(--red); }
+  .chip { font-size: 10px; background: var(--navy-100); color: var(--navy-700); padding: 2px 7px; border-radius: 4px; margin-right: 3px; }
+  .progress-track { height: 5px; background: var(--grey-100); border-radius: 4px; overflow: hidden; width: 80px; }
+  .progress-fill { height: 100%; background: var(--navy-700); }
+  .empty-state, .error-state { background: #fff; border: 1px solid var(--border); border-radius: 8px; padding: 40px 24px; text-align: center; color: var(--ink-soft); }
+  .waiting-badge { font-family: var(--mono); font-size: 11px; font-weight: 700; color: var(--navy); background: var(--navy-100); padding: 1px 7px; border-radius: 4px; }
+  .footer-note { margin-top: 24px; font-size: 11.5px; color: var(--ink-soft); text-align: center; }
+  @media (max-width: 800px) { .stat-grid { grid-template-columns: repeat(3, 1fr); } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="brand-row">
+    <div><div class="brand">IDfy — by IDfy</div><div class="brand-sub">Project Tracker — Public Dashboard</div></div>
+    <div class="updated" id="updatedLabel"></div>
+  </div>
+  <h1>Portfolio Overview</h1>
+  <p class="subtitle">Read-only snapshot — status and health across all projects</p>
+  <div id="content"><div class="empty-state">Loading…</div></div>
+  <div class="footer-note">This is a read-only summary. No login required, nothing here can be edited.</div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="js/firebase-config.js"></script>
+<script>
+  function esc(s) {
+    if (s == null) return "";
+    return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  }
+  function healthDotClass(h) {
+    if (h === "ON TRACK") return "dot-green";
+    if (h === "AT RISK") return "dot-amber";
+    if (h === "DELAYED") return "dot-red";
+    if (h === "BLOCKED") return "dot-red-solid";
+    return "";
+  }
+  function statCard(label, value, cls) {
+    return '<div class="stat-card ' + (cls || "") + '"><div class="stat-value">' + value + '</div><div class="stat-label">' + esc(label) + "</div></div>";
+  }
+
+  // Exposed on window so this can be unit-tested by feeding it fixture data
+  // without needing a real Firebase connection.
+  window.renderPublicDashboard = function (data) {
+    var el = document.getElementById("content");
+    if (!data) {
+      el.innerHTML = '<div class="empty-state">No dashboard has been published yet. Ask the tracker admin to publish one from Settings.</div>';
+      return;
+    }
+    var s = data.stats || {};
+    var html = '<div class="stat-grid">';
+    html += statCard("Total Projects", s.total || 0);
+    html += statCard("Live", s.live || 0, "stat-green");
+    html += statCard("POC", s.poc || 0, "stat-purple");
+    html += statCard("Blocked", s.blocked || 0, "stat-red");
+    html += statCard("At Risk", s.atRisk || 0, "stat-amber");
+    html += statCard("In Progress", s.inProgress || 0);
+    html += "</div>";
+
+    html += '<div class="table-wrap"><table><thead><tr><th>Client</th><th>Project</th><th>Type</th><th>Modules</th><th>Status</th><th>Health</th><th>Progress</th><th>Owner</th></tr></thead><tbody>';
+    (data.projects || []).forEach(function (p) {
+      html += "<tr>";
+      html += "<td>" + esc(p.client) + "</td>";
+      html += "<td>" + esc(p.projectName) + "</td>";
+      html += '<td><span class="badge ' + (p.projectType === "LIVE" ? "badge-live" : "badge-poc") + '">' + esc(p.projectType) + "</span></td>";
+      html += "<td>" + (p.modules || []).map(function (m) { return '<span class="chip">' + esc(m) + "</span>"; }).join("") + "</td>";
+      html += "<td>" + esc(p.statusLabel) + "</td>";
+      html += '<td><span class="health-dot ' + healthDotClass(p.health) + '"></span>' + esc(p.health) + "</td>";
+      html += '<td><div class="progress-track"><div class="progress-fill" style="width:' + (p.progress || 0) + '%"></div></div></td>';
+      html += "<td>" + esc(p.owner || "—") + "</td>";
+      html += "</tr>";
+    });
+    if (!(data.projects || []).length) html += '<tr><td colspan="8" style="text-align:center;color:var(--ink-soft);padding:24px;">No projects to show.</td></tr>';
+    html += "</tbody></table></div>";
+    el.innerHTML = html;
+
+    if (data.generatedAt) {
+      var d = data.generatedAt.toDate ? data.generatedAt.toDate() : new Date(data.generatedAt);
+      document.getElementById("updatedLabel").textContent = "Last published " + d.toLocaleString();
+    }
+  };
+
+  (function init() {
+    var enabled = typeof FIREBASE_CONFIG !== "undefined" && FIREBASE_CONFIG.apiKey !== "YOUR_API_KEY";
+    if (!enabled) {
+      document.getElementById("content").innerHTML = '<div class="error-state">This tracker is not yet connected to cloud storage, so there is no public dashboard to show.</div>';
+      return;
+    }
+    try {
+      firebase.initializeApp(FIREBASE_CONFIG);
+      var db = firebase.firestore();
+      db.collection("publicSnapshots").doc("dashboard").get().then(function (doc) {
+        window.renderPublicDashboard(doc.exists ? doc.data() : null);
+      }).catch(function (err) {
+        document.getElementById("content").innerHTML = '<div class="error-state">Couldn\'t load the dashboard (' + esc(err.message) + ').</div>';
+      });
+    } catch (e) {
+      document.getElementById("content").innerHTML = '<div class="error-state">Couldn\'t connect (' + esc(e.message) + ').</div>';
+    }
+  })();
+</script>
+</body>
+</html>

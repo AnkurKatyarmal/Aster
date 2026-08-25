@@ -108,5 +108,16 @@ service cloud.firestore {
         || (isMember() && resource.data.targetOwnerEmail == request.auth.token.email);
       allow delete: if isAdmin();
     }
+
+    // Public dashboard snapshot: a deliberately curated, high-level-only
+    // copy of portfolio status that an admin explicitly publishes. This is
+    // the ONE piece of data in this whole database readable with NO sign-in
+    // at all — by design, for a share-with-anyone leadership link. It never
+    // contains dependency notes, activity history, or emails; see
+    // buildPublicSnapshot() in js/app.js for exactly what goes in it.
+    match /publicSnapshots/{docId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
   }
 }

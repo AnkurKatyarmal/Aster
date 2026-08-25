@@ -1026,6 +1026,40 @@ var App = (function () {
   }
 
   // ---------------------------------------------------------------- settings page
+  // Deliberately curated for the PUBLIC dashboard — no emails, no
+  // dependency descriptions/notes/impact text, no activity history, no
+  // audit log. Just enough for a leadership-level status view.
+  function buildPublicSnapshot() {
+    var projects = state.projects.map(function (p) {
+      var a = Data.calcProjectAnalytics(p);
+      var dep = Data.currentDependency(p);
+      var statusLabel = (Data.STATUSES.filter(function (s) { return s.key === p.status; })[0] || {}).label || p.status;
+      return {
+        client: p.client,
+        projectName: p.projectName,
+        projectType: p.projectType,
+        environment: Kanban.envLabel(p),
+        modules: p.modules || [],
+        statusLabel: statusLabel,
+        health: p.health,
+        progress: Data.progressFor(p),
+        owner: p.owner || "",
+        totalWaitingDays: a.totalWaiting,
+        hasOpenDependency: !!dep
+      };
+    });
+    var total = projects.length;
+    var stats = {
+      total: total,
+      live: projects.filter(function (p) { return p.projectType === "LIVE"; }).length,
+      poc: projects.filter(function (p) { return p.projectType === "POC"; }).length,
+      blocked: state.projects.filter(function (p) { return p.status === "blocked"; }).length,
+      atRisk: state.projects.filter(function (p) { return p.health === "AT RISK"; }).length,
+      inProgress: state.projects.filter(function (p) { return p.status === "in-progress"; }).length
+    };
+    return { stats: stats, projects: projects };
+  }
+
   function renderSettingsPage(main) {
     var p2 = perms();
     var html = '<div class="page-header"><h1>Settings</h1><p class="page-subtitle">Data management and appearance</p></div>';
@@ -1059,6 +1093,17 @@ var App = (function () {
     html += '<button class="btn btn-danger" id="btnClearAll2"' + (canBulkManage() ? "" : " disabled") + '>Clear all data</button>';
     html += "</div></div>";
 
+    if (Storage.isCloud() && perms().admin) {
+      var publicUrl = window.location.href.replace(/\/[^\/]*$/, "/public-dashboard.html");
+      html += '<div class="settings-card"><h3>Public dashboard link</h3>';
+      html += "<p>A read-only, no-login snapshot you can share with anyone — leadership, clients, whoever. It shows portfolio stats and each project's status/health only — no dependency notes, no activity history, no emails. Nothing updates live; click Publish whenever you want the link to reflect the latest data.</p>";
+      html += '<div class="settings-actions"><button class="btn btn-primary" id="btnPublishSnapshot">Publish current data</button></div>';
+      html += '<p style="margin-top:10px;font-size:12.5px;"><strong>Share this link:</strong><br><code id="publicDashboardUrl" style="word-break:break-all;">' + esc(publicUrl) + '</code> ' +
+        '<button class="link-btn" id="btnCopyPublicUrl">Copy</button></p>';
+      html += '<div id="publishStatus" style="margin-top:8px;font-size:12.5px;color:var(--ink-soft);"></div>';
+      html += "</div>";
+    }
+
     html += '<div class="settings-card"><h3>Definitions</h3><dl class="def-list">' +
       "<dt>Waiting</dt><dd>We requested something from a dependency owner and are waiting for it.</dd>" +
       "<dt>Blocked</dt><dd>Work cannot proceed even though a dependency was received — something is actively preventing progress.</dd>" +
@@ -1066,6 +1111,27 @@ var App = (function () {
       "<dt>Health</dt><dd>An independent risk signal: On Track, At Risk, Delayed, or Blocked.</dd>" +
       "</dl></div>";
     main.innerHTML = html;
+
+    var publishBtn = $("#btnPublishSnapshot");
+    if (publishBtn) {
+      publishBtn.addEventListener("click", function () {
+        publishBtn.disabled = true;
+        Auth.publishPublicSnapshot(buildPublicSnapshot()).then(function () {
+          var status = $("#publishStatus");
+          if (status) status.textContent = "Published " + new Date().toLocaleString() + " — the link now shows this data.";
+          if (publishBtn) publishBtn.disabled = false;
+        }).catch(function (err) {
+          var status = $("#publishStatus");
+          if (status) status.textContent = "Publish failed: " + err.message;
+          if (publishBtn) publishBtn.disabled = false;
+        });
+      });
+      var copyBtn = $("#btnCopyPublicUrl");
+      if (copyBtn) copyBtn.addEventListener("click", function () {
+        var text = $("#publicDashboardUrl").textContent;
+        if (navigator.clipboard) navigator.clipboard.writeText(text);
+      });
+    }
 
     $("#btnToggleThemeSettings").addEventListener("click", function () { $("#btnThemeToggle").click(); });
     $("#btnDownloadExcelTemplate2").addEventListener("click", function () { $("#btnDownloadExcelTemplate").click(); });
