@@ -58,17 +58,31 @@ var Auth = (function () {
       ref.get().then(function (doc) {
         if (!doc.exists) {
           var isBootstrapAdmin = (window.ADMIN_EMAILS || []).indexOf(user.email) !== -1;
-          var profile = {
-            email: user.email,
-            displayName: user.displayName || user.email,
-            photoURL: user.photoURL || "",
-            status: isBootstrapAdmin ? "approved" : "pending",
-            role: isBootstrapAdmin ? "admin" : "viewer",
-            requestedAt: firebase.firestore.FieldValue.serverTimestamp(),
-            approvedAt: isBootstrapAdmin ? firebase.firestore.FieldValue.serverTimestamp() : null,
-            approvedBy: isBootstrapAdmin ? "bootstrap" : null
-          };
-          return ref.set(profile);
+          if (isBootstrapAdmin) {
+            return ref.set({
+              email: user.email, displayName: user.displayName || user.email, photoURL: user.photoURL || "",
+              status: "approved", role: "admin",
+              requestedAt: firebase.firestore.FieldValue.serverTimestamp(),
+              approvedAt: firebase.firestore.FieldValue.serverTimestamp(), approvedBy: "bootstrap"
+            });
+          }
+          return db.collection("invites").doc(user.email.toLowerCase().trim()).get().then(function (inviteDoc) {
+            if (inviteDoc.exists) {
+              var inv = inviteDoc.data();
+              return ref.set({
+                email: user.email, displayName: user.displayName || user.email, photoURL: user.photoURL || "",
+                status: "approved", role: inv.role,
+                requestedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                approvedAt: firebase.firestore.FieldValue.serverTimestamp(), approvedBy: "invite:" + (inv.invitedBy || "admin")
+              });
+            }
+            return ref.set({
+              email: user.email, displayName: user.displayName || user.email, photoURL: user.photoURL || "",
+              status: "pending", role: "viewer",
+              requestedAt: firebase.firestore.FieldValue.serverTimestamp(),
+              approvedAt: null, approvedBy: null
+            });
+          });
         }
       }).then(function () {
         // live-subscribe so approval reflects instantly without refresh
@@ -239,6 +253,29 @@ var Auth = (function () {
     });
   }
 
+  // ---- invites: pre-approve someone before they ever sign in ----
+  function createInvite(email, role) {
+    var id = email.toLowerCase().trim();
+    return db.collection("invites").doc(id).set({
+      email: id,
+      role: role,
+      invitedBy: currentUser ? currentUser.email : "unknown",
+      invitedAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+  }
+
+  function listInvites(callback) {
+    db.collection("invites").get().then(function (snap) {
+      var rows = [];
+      snap.forEach(function (doc) { rows.push(Object.assign({ id: doc.id }, doc.data())); });
+      callback(rows);
+    });
+  }
+
+  function cancelInvite(email) {
+    return db.collection("invites").doc(email.toLowerCase().trim()).delete();
+  }
+
   return {
     ROLES: ROLES,
     ROLE_LABELS: ROLE_LABELS,
@@ -260,6 +297,9 @@ var Auth = (function () {
     submitPendingChange: submitPendingChange,
     listPendingChangesFor: listPendingChangesFor,
     markChangeReviewed: markChangeReviewed,
+    createInvite: createInvite,
+    listInvites: listInvites,
+    cancelInvite: cancelInvite,
     getDb: function () { return db; }
   };
 })();

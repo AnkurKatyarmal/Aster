@@ -931,8 +931,46 @@ var App = (function () {
       return;
     }
     var html = '<div class="page-header"><h1>Access Requests</h1><p class="page-subtitle">Approve new sign-ins and manage roles</p></div>';
+
+    html += '<div class="settings-card"><h3>Invite someone</h3><p>Pre-approve an email with a role — the moment they sign in with that Google account, they land straight in with no waiting screen.</p>';
+    html += '<div class="settings-actions">';
+    html += '<input type="email" id="inviteEmail" placeholder="name@company.com" style="flex:1;min-width:220px;padding:8px 10px;border:1px solid var(--border);border-radius:6px;">';
+    html += '<select id="inviteRole">' + Auth.ROLES.map(function (r) { return '<option value="' + r + '">' + Auth.ROLE_LABELS[r] + "</option>"; }).join("") + "</select>";
+    html += '<button class="btn btn-primary btn-sm" id="btnSendInvite">Send Invite</button>';
+    html += '</div><div id="invitesListSection" style="margin-top:14px;"></div></div>';
+
     html += '<div id="pendingSection"></div><div class="section-title">All Users</div><div id="allUsersSection"></div>';
     main.innerHTML = html;
+
+    $("#btnSendInvite").addEventListener("click", function () {
+      var email = $("#inviteEmail").value.trim();
+      if (!email || email.indexOf("@") === -1) return alert("Enter a valid email address.");
+      Auth.createInvite(email, $("#inviteRole").value).then(function () {
+        $("#inviteEmail").value = "";
+        refreshInvites();
+      });
+    });
+
+    function refreshInvites() {
+      Auth.listInvites(function (rows) {
+        var el = $("#invitesListSection");
+        if (!rows.length) { el.innerHTML = '<div class="empty-state">No pending invites.</div>'; return; }
+        var h = '<div class="table-wrap"><table class="data-table"><thead><tr><th>Email</th><th>Role</th><th>Invited By</th><th></th></tr></thead><tbody>';
+        rows.forEach(function (inv) {
+          h += "<tr><td>" + esc(inv.email) + "</td><td>" + esc(Auth.ROLE_LABELS[inv.role] || inv.role) + "</td><td>" + esc(inv.invitedBy) + "</td>" +
+            '<td><button class="link-btn link-danger" data-cancel-invite="' + esc(inv.email) + '">Cancel invite</button></td></tr>';
+        });
+        h += "</tbody></table></div>";
+        el.innerHTML = h;
+        $all("[data-cancel-invite]", el).forEach(function (btn) {
+          btn.addEventListener("click", function () {
+            if (!confirm("Cancel this invite?")) return;
+            Auth.cancelInvite(btn.getAttribute("data-cancel-invite")).then(refreshInvites);
+          });
+        });
+      });
+    }
+    refreshInvites();
 
     Auth.listPendingUsers(function (rows) {
       var el = $("#pendingSection");

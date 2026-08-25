@@ -82,6 +82,26 @@ From then on, everyone else who signs in lands in **Access Requests** (in
 your sidebar) for you to approve as one of five roles — see "Roles and the
 maker-checker workflow" below for what each one can actually do.
 
+### Pre-approving someone (invites)
+
+You don't have to wait for someone to sign in before deciding their role.
+On the **Access Requests** page, under "Invite someone," enter their email
+and pick a role, then **Send Invite**. The moment they sign in with that
+Google account, they land straight in with that role already active — no
+"waiting for approval" screen at all. This is the easiest way to add your
+Program Director (or anyone) as **Viewer + Download**: invite them, send
+them the link, and they're in with one click and no back-and-forth.
+
+You can cancel an unused invite at any time from the same page.
+
+> **On a fully public link:** this tracker holds real client names and
+> delivery detail, so there's no "no login at all" public mode — inviting
+> someone as Viewer keeps things secure while still being effectively
+> one-click for them (they just choose their Google account, no password).
+> If you specifically want a zero-login public status page later, that's a
+> separate feature (a curated, admin-published snapshot with only
+> high-level stats) — ask and it can be added.
+
 > **On notifications:** the admin (and members, for changes on their own
 > projects) sees a live badge on "Access Requests" / "Approvals" while the
 > app is open, and it updates without a refresh. True push or email

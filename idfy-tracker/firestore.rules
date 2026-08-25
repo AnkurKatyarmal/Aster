@@ -24,26 +24,42 @@ service cloud.firestore {
       return request.auth.token.email in ['ankur.katyarmal@gmail.com'];
     }
 
+    // Invites let an admin pre-approve someone by email, before they've
+    // ever signed in. Doc id = lowercased email. Only matters on a user's
+    // very first sign-in — see the /users create rule below.
+    function hasInvite() {
+      return exists(/databases/$(database)/documents/invites/$(request.auth.token.email));
+    }
+    function inviteRole() {
+      return get(/databases/$(database)/documents/invites/$(request.auth.token.email)).data.role;
+    }
+
     match /users/{uid} {
       // Read your own profile always; read anyone's once you're approved
       // (needed for the admin/member "assign owner" pickers and the
       // Access Requests / All Users lists).
       allow read: if request.auth != null && (request.auth.uid == uid || isApproved());
 
-      // A user may only ever create THEIR OWN doc, and only in one of two
-      // shapes: a normal pending request, or — solely for emails in the
-      // bootstrap admin list — an already-approved admin record. No other
-      // combination of role/status is accepted on create, so nobody can
-      // self-approve or self-promote by writing their own profile.
+      // A user may only ever create THEIR OWN doc, and only in one of three
+      // shapes: a normal pending request; an already-approved admin record
+      // (solely for emails in the bootstrap admin list); or an
+      // already-approved record matching a role an admin pre-set via an
+      // invite. No other combination of role/status is accepted on
+      // create, so nobody can self-approve or self-promote by writing
+      // their own profile.
       allow create: if request.auth != null && request.auth.uid == uid && (
         (
-          !isBootstrapAdminEmail()
+          !isBootstrapAdminEmail() && !hasInvite()
           && request.resource.data.status == 'pending'
           && request.resource.data.role in ['viewer', 'member', 'intern', 'viewer_download']
         ) || (
           isBootstrapAdminEmail()
           && request.resource.data.status == 'approved'
           && request.resource.data.role == 'admin'
+        ) || (
+          hasInvite() && !isBootstrapAdminEmail()
+          && request.resource.data.status == 'approved'
+          && request.resource.data.role == inviteRole()
         )
       );
 
@@ -51,6 +67,15 @@ service cloud.firestore {
       // (approve, reject, revoke, change role) — including their own.
       allow update: if isAdmin();
       allow delete: if isAdmin();
+    }
+
+    // Invites: admin pre-approves an email + role before that person ever
+    // signs in. The invited person can read (not write) their own invite
+    // doc so the client can show them nothing unusual — the actual grant
+    // happens via the /users create rule above, driven by hasInvite().
+    match /invites/{email} {
+      allow read: if isAdmin() || (request.auth != null && request.auth.token.email == email);
+      allow write: if isAdmin();
     }
 
     // Projects: an admin can read/write any project. A member can create a
