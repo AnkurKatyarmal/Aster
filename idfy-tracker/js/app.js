@@ -219,9 +219,14 @@ var App = (function () {
   function attachSettingsButtons() {
     $("#btnExport").addEventListener("click", function () { Storage.exportJSON(state.projects); });
     $("#btnDownloadTemplate").addEventListener("click", function () { Storage.downloadTemplate(); });
+    $("#btnDownloadExcelTemplate").addEventListener("click", function () { ExcelIO.downloadTemplate(); });
     $("#btnImport").addEventListener("click", function () {
       if (!perms().edit) return alert("You have view-only access and can't import data.");
       $("#importFileInput").click();
+    });
+    $("#btnImportExcel").addEventListener("click", function () {
+      if (!perms().edit) return alert("You have view-only access and can't import data.");
+      $("#importExcelInput").click();
     });
     $("#importFileInput").addEventListener("change", function (e) {
       var file = e.target.files[0];
@@ -230,6 +235,16 @@ var App = (function () {
         if (err) { alert("Import failed:\n\n" + err.message); return; }
         replaceAllProjects(data);
         alert("Import complete — " + data.length + " project(s) loaded.");
+      });
+      e.target.value = "";
+    });
+    $("#importExcelInput").addEventListener("change", function (e) {
+      var file = e.target.files[0];
+      if (!file) return;
+      ExcelIO.importFile(file, function (err, data) {
+        if (err) { alert("Import failed — please fix these and re-upload:\n\n" + err.message); return; }
+        replaceAllProjects(data);
+        alert("Import complete — " + data.length + " project(s) loaded from Excel.");
       });
       e.target.value = "";
     });
@@ -584,10 +599,17 @@ var App = (function () {
       ? "Connected to shared cloud storage (Firestore). Changes sync live across everyone with access."
       : Auth.isEnabled() ? "Firebase is configured but you're not yet an approved user." : "Running in local mode — data is saved only in this browser's <code>localStorage</code>. Fill in <code>js/firebase-config.js</code> to enable shared cloud storage and Google sign-in (see README).") + "</p></div>";
 
-    html += '<div class="settings-card"><h3>Import / Export data</h3>';
-    html += "<p>Import expects a JSON array of project objects. Download the template below to see the exact structure, including the activity/timeline fields.</p>";
+    html += '<div class="settings-card"><h3>Import / Export data (Excel)</h3>';
+    html += "<p>Download the template, fill it in (Excel, or Google Sheets — edit there, then <strong>File \u2192 Download \u2192 Microsoft Excel (.xlsx)</strong>), and upload it back here. One row per project on the <strong>Projects</strong> tab, one row per timeline entry on the <strong>Activities</strong> tab, linked by matching Client + Project Name.</p>";
     html += '<div class="settings-actions">';
-    html += '<button class="btn btn-secondary" id="btnDownloadTemplate2"' + (p2.download ? "" : " disabled") + '>Download import template</button>';
+    html += '<button class="btn btn-secondary" id="btnDownloadExcelTemplate2"' + (p2.download ? "" : " disabled") + '>Download Excel template</button>';
+    html += '<button class="btn btn-primary" id="btnImportExcel2"' + (p2.edit ? "" : " disabled") + '>Import from Excel (.xlsx)</button>';
+    html += "</div></div>";
+
+    html += '<div class="settings-card"><h3>Advanced: JSON export / import</h3>';
+    html += "<p>For backups, or scripting against the data directly. Most people should use the Excel option above instead.</p>";
+    html += '<div class="settings-actions">';
+    html += '<button class="btn btn-secondary" id="btnDownloadTemplate2"' + (p2.download ? "" : " disabled") + '>Download JSON template</button>';
     html += '<button class="btn btn-secondary" id="btnExport2"' + (p2.download ? "" : " disabled") + '>Export current data (JSON)</button>';
     html += '<button class="btn btn-secondary" id="btnImport2"' + (p2.edit ? "" : " disabled") + '>Import data (JSON)</button>';
     html += "</div></div>";
@@ -607,6 +629,8 @@ var App = (function () {
     main.innerHTML = html;
 
     $("#btnToggleThemeSettings").addEventListener("click", function () { $("#btnThemeToggle").click(); });
+    $("#btnDownloadExcelTemplate2").addEventListener("click", function () { $("#btnDownloadExcelTemplate").click(); });
+    $("#btnImportExcel2").addEventListener("click", function () { $("#btnImportExcel").click(); });
     $("#btnDownloadTemplate2").addEventListener("click", function () { $("#btnDownloadTemplate").click(); });
     $("#btnExport2").addEventListener("click", function () { $("#btnExport").click(); });
     $("#btnImport2").addEventListener("click", function () { $("#btnImport").click(); });

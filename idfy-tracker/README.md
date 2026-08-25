@@ -101,50 +101,23 @@ choice is remembered per-browser.
 
 ## Importing data
 
-Settings → **Download import template** gives you the exact JSON shape
-expected. In short, import expects a JSON **array** of project objects:
+**Settings → Download Excel template** gives you a `.xlsx` file with three tabs:
 
-```json
-[
-  {
-    "client": "Example Client Ltd",
-    "projectName": "Example Privy Rollout",
-    "projectType": "POC",
-    "environment": "Cloud",
-    "cloudProvider": "GCP",
-    "infrastructureOwnership": "Client",
-    "owner": "Your Name",
-    "startDate": "2026-08-01",
-    "targetDate": "2026-10-01",
-    "status": "planned",
-    "health": "ON TRACK",
-    "modules": ["CGP", "DPRM"],
-    "description": "One-line description of the engagement.",
-    "activities": [
-      {
-        "date": "2026-08-01",
-        "activityType": "MEETING",
-        "description": "Kickoff call",
-        "ownerType": "PROJECT / PM",
-        "owner": "Your Name",
-        "dependencySide": "Internal",
-        "requestedDate": "",
-        "expectedDate": "",
-        "receivedDate": "",
-        "status": "COMPLETED"
-      }
-    ]
-  }
-]
-```
+- **Projects** — one row per project.
+- **Activities** — one row per timeline entry, linked to its project by matching **Client + Project Name** exactly (spelling must match between the two tabs).
+- **Instructions** — the exact allowed values for every dropdown-style column (Status, Health, Environment, Modules, etc.), so you know what to type.
 
-Required per project: `client`, `projectName`, `projectType` (`POC`/`LIVE`),
-`status` (one of `backlog`/`planned`/`in-progress`/`blocked`/`uat`/`completed`),
-`health` (`ON TRACK`/`AT RISK`/`DELAYED`/`BLOCKED`). Everything else is
-optional — `id` and activity `id`s are auto-generated if missing. Bad or
-missing fields are reported with a specific error message (which project,
-which field) rather than failing silently. **Importing replaces your current
-dataset**, so export first if you want a backup.
+Fill it in using Excel, or **Google Sheets**:
+1. Upload the downloaded `.xlsx` to Google Drive.
+2. Open it with Google Sheets and edit both tabs.
+3. **File → Download → Microsoft Excel (.xlsx)**.
+4. Go to **Settings → Import from Excel (.xlsx)** in the tracker and upload that file.
+
+**Importing replaces your entire current dataset**, so export a backup first if you want to keep what's there (**Settings → Export current data**).
+
+Bad or missing values are reported with the exact row number and column, e.g. *"Projects row 4 (Consent Rollout): Status must be one of Backlog/Planned/In Progress/Blocked/UAT/Completed, got \"Inprogress\""* or *"Activities row 7: no project found matching Client 'Acme Bank' + Project Name 'Data Compass' — check spelling matches the Projects sheet exactly."*
+
+There's also a **JSON export/import** option under **Settings → Advanced** for backups or scripting — same underlying data, just the raw format instead of spreadsheet rows.
 
 ---
 
@@ -180,6 +153,7 @@ js/
     timeline.js             per-project vertical timeline + global timeline table
     analytics.js            Analytics page
     reports.js              Project report + weekly status report (print/PDF)
+    excel-import.js         Excel (.xlsx) template + import parser (SheetJS)
     app.js                  application controller: state, navigation, modals, CRUD, permissions
 ```
 

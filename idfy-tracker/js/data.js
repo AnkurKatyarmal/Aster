@@ -75,6 +75,33 @@ var Data = (function () {
     "CANCELLED"
   ];
 
+  // -- lookups used by the UI and the Excel importer, so both agree on
+  //    exactly the same label <-> key mapping and fuzzy matching rules ---
+  function statusKeyFromLabel(label) {
+    var found = STATUSES.filter(function (s) {
+      return s.label.toLowerCase() === String(label || "").trim().toLowerCase();
+    })[0];
+    return found ? found.key : null;
+  }
+  function statusLabelFromKey(key) {
+    var found = STATUSES.filter(function (s) { return s.key === key; })[0];
+    return found ? found.label : null;
+  }
+  // Case/whitespace-insensitive match against a fixed list of allowed
+  // values (e.g. "on track" -> "ON TRACK"). Returns null if no match.
+  function fuzzyMatch(value, allowedList) {
+    var norm = String(value || "").trim().toLowerCase();
+    var found = allowedList.filter(function (v) { return v.toLowerCase() === norm; })[0];
+    return found || null;
+  }
+  // Splits a comma/semicolon-separated cell into a clean module list,
+  // matching each piece against Data.MODULES case-insensitively.
+  function parseModuleList(cell) {
+    if (!cell) return [];
+    return String(cell).split(/[,;]/).map(function (s) { return s.trim(); }).filter(Boolean)
+      .map(function (s) { return fuzzyMatch(s, MODULES) || s; });
+  }
+
   // -- id generation ---------------------------------------------------
   var counter = 0;
   function generateId(prefix) {
@@ -459,6 +486,10 @@ var Data = (function () {
     DEPENDENCY_SIDES: DEPENDENCY_SIDES,
     ACTIVITY_STATUSES: ACTIVITY_STATUSES,
     generateId: generateId,
+    statusKeyFromLabel: statusKeyFromLabel,
+    statusLabelFromKey: statusLabelFromKey,
+    fuzzyMatch: fuzzyMatch,
+    parseModuleList: parseModuleList,
     parseDate: parseDate,
     formatDate: formatDate,
     todayStr: todayStr,
