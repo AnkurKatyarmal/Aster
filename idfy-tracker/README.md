@@ -127,13 +127,24 @@ There's also a **JSON export/import** option under **Settings → Advanced** for
 
 - **Project Report** — pick a project, get a full one-page delivery report:
   info, current dependency, waiting-time analytics, complete activity timeline.
+- **POC Templates** — pick a module (CGP, Cookie Manager, or Data Compass),
+  and get a pre-filled, editable **Kickoff/Scope document** to share with a
+  client at the start of a POC. Everything — objective, scope, timeline,
+  success criteria, assumptions — comes pre-written per module so you're
+  editing rather than starting from a blank page. Checking "Also add this as
+  a new POC project" creates the tracked project at the same time, seeded
+  with a Kickoff activity. Once the POC wraps up, use **POC Completion
+  Report** — link it to the existing project (auto-fills client, module, and
+  dates) or enter manually, fill in the module-specific metrics (e.g. PII
+  fields classified for Data Compass, consent capture rate for CGP), and
+  generate the completion report.
 - **Weekly Status Update** — pick a date range, get a portfolio-wide summary:
   status/health table for every project, all activity logged in that window,
   and a currently-blocked list.
 
-Both open in a new tab styled for print. Click **Print / Save as PDF** and
-choose "Save as PDF" as the destination in your browser's print dialog — no
-extra software needed.
+All reports open in a new tab styled for print. Click **Print / Save as PDF**
+and choose "Save as PDF" as the destination in your browser's print dialog —
+no extra software needed.
 
 ---
 
@@ -152,7 +163,8 @@ js/
     kanban.js               Kanban board rendering + drag-and-drop
     timeline.js             per-project vertical timeline + global timeline table
     analytics.js            Analytics page
-    reports.js              Project report + weekly status report (print/PDF)
+    reports.js              Project report + POC templates + weekly status report (print/PDF)
+    poc-templates.js        Predefined per-module (CGP/Cookie Manager/Data Compass) POC content
     excel-import.js         Excel (.xlsx) template + import parser (SheetJS)
     app.js                  application controller: state, navigation, modals, CRUD, permissions
 ```

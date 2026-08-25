@@ -65,6 +65,9 @@ var Reports = (function () {
       ".rp-timeline-item.client{border-left-color:" + BRAND.red + ";}",
       ".rp-timeline-date{font-weight:700;color:" + BRAND.navy + ";margin-right:8px;}",
       ".rp-empty{color:" + BRAND.grey + ";font-size:12px;font-style:italic;}",
+      "ul.rp-list{margin:0;padding-left:18px;font-size:12px;}",
+      "ul.rp-list li{margin-bottom:5px;}",
+      ".rp-module-tag{display:inline-block;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.4px;background:" + BRAND.navyTint + ";color:" + BRAND.navy + ";padding:3px 10px;border-radius:4px;margin-bottom:8px;}",
       "@media print{.no-print{display:none !important;} body{padding:0;} #reportRoot{padding:0 6mm;max-width:none;} @page{margin:14mm;}}"
     ].join("\n");
   }
@@ -226,5 +229,82 @@ var Reports = (function () {
     setTimeout(function () { try { win.focus(); } catch (e) {} }, 300);
   }
 
-  return { projectReport: projectReport, weeklyReport: weeklyReport };
+  // -------------------------------------------------- POC kickoff / scope document
+  function linesToList(text) {
+    return (text || "").split("\n").map(function (s) { return s.trim(); }).filter(Boolean);
+  }
+  function bulletList(text) {
+    var items = linesToList(text);
+    if (!items.length) return "<div class='rp-empty'>Not specified.</div>";
+    return "<ul class='rp-list'>" + items.map(function (i) { return "<li>" + esc(i) + "</li>"; }).join("") + "</ul>";
+  }
+
+  function pocKickoffReport(f) {
+    var win = shellOpen("POC Kickoff — " + f.client);
+    if (!win) return;
+
+    var html = "";
+    html += "<div class='rp-header'>" +
+      "<div><div class='rp-brand'>IDfy — by IDfy</div><div class='rp-brand-sub'>Proof of Concept — Scope & Kickoff Document</div>" +
+      "<h1 class='rp-title'>" + esc(f.client) + " — " + esc(f.projectName) + "</h1></div>" +
+      "<div class='rp-meta'>Generated " + Data.formatDate(Data.todayStr()) + "<br>Owner: " + esc(f.owner || "—") + "</div>" +
+      "</div>";
+
+    html += "<span class='rp-module-tag'>" + esc(f.moduleLabel) + "</span>";
+
+    html += "<div class='rp-section'><div class='rp-section-title'>Engagement Details</div><div class='rp-grid'>";
+    html += gridItem("Client", f.client);
+    html += gridItem("Project Type", "<span class='rp-badge rp-badge-poc'>POC</span>");
+    html += gridItem("Module", f.moduleLabel);
+    html += gridItem("Start Date", Data.formatDate(f.startDate));
+    html += gridItem("Target Completion", f.targetDate ? Data.formatDate(f.targetDate) : "—");
+    html += gridItem("Environment", f.environment || "—");
+    html += "</div></div>";
+
+    html += "<div class='rp-section'><div class='rp-section-title'>Objective</div><p style='font-size:12.5px;margin:0;'>" + esc(f.objective) + "</p></div>";
+    html += "<div class='rp-section'><div class='rp-section-title'>Scope</div>" + bulletList(f.scope) + "</div>";
+    html += "<div class='rp-section'><div class='rp-section-title'>Indicative Timeline</div>" + bulletList(f.timeline) + "</div>";
+    html += "<div class='rp-section'><div class='rp-section-title'>Success Criteria</div>" + bulletList(f.successCriteria) + "</div>";
+    html += "<div class='rp-section'><div class='rp-section-title'>Assumptions & Exclusions</div>" + bulletList(f.assumptions) + "</div>";
+
+    win.document.getElementById("reportRoot").innerHTML = html;
+    setTimeout(function () { try { win.focus(); } catch (e) {} }, 300);
+  }
+
+  // -------------------------------------------------- POC completion report
+  function pocCompletionReport(f) {
+    var win = shellOpen("POC Report — " + f.client);
+    if (!win) return;
+
+    var html = "";
+    html += "<div class='rp-header'>" +
+      "<div><div class='rp-brand'>IDfy — by IDfy</div><div class='rp-brand-sub'>Proof of Concept — Completion Report</div>" +
+      "<h1 class='rp-title'>" + esc(f.client) + " — " + esc(f.projectName) + "</h1></div>" +
+      "<div class='rp-meta'>Generated " + Data.formatDate(Data.todayStr()) + "<br>Owner: " + esc(f.owner || "—") + "</div>" +
+      "</div>";
+
+    html += "<span class='rp-module-tag'>" + esc(f.moduleLabel) + "</span>";
+
+    if (f.metrics && f.metrics.length) {
+      html += "<div class='rp-stat-row'>";
+      f.metrics.forEach(function (m) { if (m.value) html += statBlock(m.label, m.value); });
+      html += "</div>";
+    }
+
+    html += "<div class='rp-section'><div class='rp-section-title'>Engagement Details</div><div class='rp-grid'>";
+    html += gridItem("Client", f.client);
+    html += gridItem("Module", f.moduleLabel);
+    html += gridItem("Start Date", Data.formatDate(f.startDate));
+    html += gridItem("Completion Date", f.completionDate ? Data.formatDate(f.completionDate) : Data.formatDate(Data.todayStr()));
+    html += "</div></div>";
+
+    html += "<div class='rp-section'><div class='rp-section-title'>Key Findings</div>" + bulletList(f.findings) + "</div>";
+    html += "<div class='rp-section'><div class='rp-section-title'>Recommendation</div><p style='font-size:12.5px;margin:0;'>" + esc(f.recommendation) + "</p></div>";
+    html += "<div class='rp-section'><div class='rp-section-title'>Next Steps</div>" + bulletList(f.nextSteps) + "</div>";
+
+    win.document.getElementById("reportRoot").innerHTML = html;
+    setTimeout(function () { try { win.focus(); } catch (e) {} }, 300);
+  }
+
+  return { projectReport: projectReport, weeklyReport: weeklyReport, pocKickoffReport: pocKickoffReport, pocCompletionReport: pocCompletionReport };
 })();

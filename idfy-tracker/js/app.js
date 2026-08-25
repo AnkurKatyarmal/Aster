@@ -498,6 +498,12 @@ var App = (function () {
     html += '<button class="btn btn-primary" id="btnGenProjectReport">Generate Project Report</button>';
     html += "</div></div>";
 
+    html += '<div class="settings-card"><h3>POC Templates</h3><p>Pick a module for a pre-filled scope document or completion report — edit anything before generating.</p>';
+    html += '<div class="settings-actions">';
+    html += '<button class="btn btn-primary" id="btnNewPoc">+ New POC (Kickoff Document)</button>';
+    html += '<button class="btn btn-secondary" id="btnPocCompletion">POC Completion Report</button>';
+    html += "</div></div>";
+
     var todayStr = Data.todayStr();
     var weekAgo = new Date(Data.parseDate(todayStr).getTime() - 6 * 86400000).toISOString().slice(0, 10);
     html += '<div class="settings-card"><h3>Weekly Status Update</h3><p>Portfolio-wide status summary and all activity logged within a date range, across every project.</p>';
@@ -508,6 +514,9 @@ var App = (function () {
 
     main.innerHTML = html;
 
+    $("#btnNewPoc").addEventListener("click", openNewPocModal);
+    $("#btnPocCompletion").addEventListener("click", openPocCompletionModal);
+
     if (!state.projects.length) return;
     $("#btnGenProjectReport").addEventListener("click", function () {
       var project = findProject($("#reportProjectSelect").value);
@@ -515,6 +524,199 @@ var App = (function () {
     });
     $("#btnGenWeeklyReport").addEventListener("click", function () {
       Reports.weeklyReport(state.projects, $("#weeklyFrom").value, $("#weeklyTo").value);
+    });
+  }
+
+  // ---------------------------------------------------------------- POC templates: New POC (kickoff)
+  function openNewPocModal() {
+    var modules = PocTemplates.list();
+    var mod = modules[0];
+
+    var html = '<div class="modal-header"><h2>New POC — Kickoff Document</h2><button class="drawer-close" id="modalCloseBtn">&times;</button></div>';
+    html += '<form id="pocForm" class="form-grid">';
+    html += formField("Module", selectHtml("poc_module", modules.map(function (m) { return m.label; }), mod.label, true));
+    html += formField("Client Name", '<input type="text" id="poc_client" required>');
+    html += formField("Project Name", '<input type="text" id="poc_projectName" placeholder="e.g. Consent Governance POC" required>');
+    html += formField("POC Owner", '<input type="text" id="poc_owner">');
+    html += formField("Environment", selectHtml("poc_environment", Data.ENV_TYPES, "SaaS", true));
+    html += formField("Cloud Provider", selectHtml("poc_cloudProvider", Data.CLOUD_PROVIDERS, "AWS"), "poc_cloudProviderRow");
+    html += formField("Start Date", '<input type="date" id="poc_startDate" value="' + Data.todayStr() + '" required>');
+    html += formField("Target Completion", '<input type="date" id="poc_targetDate">');
+    html += formField("Objective", '<textarea id="poc_objective" rows="2">' + esc(mod.kickoff.objective) + "</textarea>", null, true);
+    html += formField("Scope (one item per line)", '<textarea id="poc_scope" rows="5">' + esc(mod.kickoff.scope) + "</textarea>", null, true);
+    html += formField("Indicative Timeline (one item per line)", '<textarea id="poc_timeline" rows="4">' + esc(mod.kickoff.timeline) + "</textarea>", null, true);
+    html += formField("Success Criteria (one item per line)", '<textarea id="poc_successCriteria" rows="4">' + esc(mod.kickoff.successCriteria) + "</textarea>", null, true);
+    html += formField("Assumptions & Exclusions (one item per line)", '<textarea id="poc_assumptions" rows="4">' + esc(mod.kickoff.assumptions) + "</textarea>", null, true);
+    html += '<div class="form-field form-field-full"><label class="ms-option" style="text-transform:none;"><input type="checkbox" id="poc_alsoCreate" checked> Also add this as a new POC project in the tracker</label></div>';
+    html += '<div class="form-actions"><button type="button" class="btn btn-ghost" id="btnCancelPoc">Cancel</button><button type="submit" class="btn btn-primary">Generate Kickoff Document</button></div>';
+    html += "</form>";
+    openModal(html);
+
+    function toggleCloudRow() { var row = $("#poc_cloudProviderRow"); if (row) row.style.display = $("#poc_environment").value === "Cloud" ? "" : "none"; }
+    $("#poc_environment").addEventListener("change", toggleCloudRow);
+    toggleCloudRow();
+
+    $("#poc_module").addEventListener("change", function () {
+      var m = modules.filter(function (x) { return x.label === $("#poc_module").value; })[0];
+      if (!m) return;
+      $("#poc_objective").value = m.kickoff.objective;
+      $("#poc_scope").value = m.kickoff.scope;
+      $("#poc_timeline").value = m.kickoff.timeline;
+      $("#poc_successCriteria").value = m.kickoff.successCriteria;
+      $("#poc_assumptions").value = m.kickoff.assumptions;
+    });
+
+    $("#modalCloseBtn").addEventListener("click", closeModal);
+    $("#btnCancelPoc").addEventListener("click", closeModal);
+
+    $("#pocForm").addEventListener("submit", function (e) {
+      e.preventDefault();
+      var selectedMod = modules.filter(function (x) { return x.label === $("#poc_module").value; })[0] || mod;
+      var environment = $("#poc_environment").value;
+      var cloudProvider = environment === "Cloud" ? $("#poc_cloudProvider").value : "";
+
+      var fields = {
+        client: $("#poc_client").value.trim(),
+        projectName: $("#poc_projectName").value.trim(),
+        owner: $("#poc_owner").value.trim(),
+        environment: environment === "Cloud" ? ("Cloud — " + cloudProvider) : environment,
+        startDate: $("#poc_startDate").value,
+        targetDate: $("#poc_targetDate").value,
+        moduleLabel: selectedMod.label,
+        objective: $("#poc_objective").value.trim(),
+        scope: $("#poc_scope").value,
+        timeline: $("#poc_timeline").value,
+        successCriteria: $("#poc_successCriteria").value,
+        assumptions: $("#poc_assumptions").value
+      };
+
+      if (!fields.client || !fields.projectName) { alert("Client Name and Project Name are required."); return; }
+
+      if ($("#poc_alsoCreate").checked && perms().edit) {
+        var newProject = {
+          id: Data.generateId("proj"),
+          client: fields.client,
+          projectName: fields.projectName,
+          projectType: "POC",
+          environment: environment,
+          cloudProvider: cloudProvider,
+          infrastructureOwnership: "IDfy",
+          owner: fields.owner,
+          startDate: fields.startDate,
+          targetDate: fields.targetDate,
+          status: "planned",
+          health: "ON TRACK",
+          modules: [selectedMod.dataModule],
+          description: fields.objective,
+          activities: [{
+            id: Data.generateId("act"),
+            date: fields.startDate,
+            activityType: "MEETING",
+            description: "POC kickoff — scope document generated",
+            ownerType: "PROJECT / PM",
+            owner: fields.owner,
+            dependencySide: "Internal",
+            requestedBy: "", requestedDate: "", expectedDate: "", receivedDate: "",
+            status: "COMPLETED", impact: "", relatedPhase: "Kickoff", notes: ""
+          }],
+          auditLog: [{ date: Data.todayStr(), text: "Project created from New POC template (" + selectedMod.label + ")" }]
+        };
+        state.projects.push(newProject);
+        persistProject(newProject);
+      }
+
+      closeModal();
+      Reports.pocKickoffReport(fields);
+      if (["dashboard", "kanban", "projects"].indexOf(state.page) !== -1) renderPage();
+    });
+  }
+
+  // ---------------------------------------------------------------- POC templates: Completion Report
+  function openPocCompletionModal() {
+    var modules = PocTemplates.list();
+    var linkedProject = null;
+
+    var html = '<div class="modal-header"><h2>POC Completion Report</h2><button class="drawer-close" id="modalCloseBtn">&times;</button></div>';
+    html += '<form id="pocCompletionForm" class="form-grid">';
+    if (state.projects.length) {
+      html += formField("Link to existing project (optional)", '<select id="pocc_linkProject"><option value="">— Manual entry —</option>' +
+        state.projects.map(function (p) { return '<option value="' + p.id + '">' + esc(p.client) + " — " + esc(p.projectName) + "</option>"; }).join("") + "</select>", null, true);
+    }
+    html += formField("Module", selectHtml("pocc_module", modules.map(function (m) { return m.label; }), modules[0].label, true));
+    html += formField("Client Name", '<input type="text" id="pocc_client" required>');
+    html += formField("Project Name", '<input type="text" id="pocc_projectName" required>');
+    html += formField("Owner", '<input type="text" id="pocc_owner">');
+    html += formField("Start Date", '<input type="date" id="pocc_startDate">');
+    html += formField("Completion Date", '<input type="date" id="pocc_completionDate" value="' + Data.todayStr() + '">');
+    html += '<div class="form-field form-field-full" id="pocc_metricsFields"></div>';
+    html += formField("Key Findings (one item per line)", '<textarea id="pocc_findings" rows="4"></textarea>', null, true);
+    html += formField("Recommendation", '<textarea id="pocc_recommendation" rows="2"></textarea>', null, true);
+    html += formField("Next Steps (one item per line)", '<textarea id="pocc_nextSteps" rows="4"></textarea>', null, true);
+    html += '<div class="form-actions"><button type="button" class="btn btn-ghost" id="btnCancelPocc">Cancel</button><button type="submit" class="btn btn-primary">Generate Completion Report</button></div>';
+    html += "</form>";
+    openModal(html);
+
+    function renderMetricsFields(mod) {
+      var el = $("#pocc_metricsFields");
+      el.innerHTML = '<label>Metrics</label><div class="form-grid" style="padding:0;">' +
+        mod.completion.metricFields.map(function (m) {
+          return '<div class="form-field"><label>' + esc(m.label) + '</label><input type="text" data-metric-key="' + m.key + '" placeholder="e.g. 12,480"></div>';
+        }).join("") + "</div>";
+    }
+    function applyModuleDefaults(mod) {
+      renderMetricsFields(mod);
+      $("#pocc_findings").value = mod.completion.findings;
+      $("#pocc_recommendation").value = mod.completion.recommendation;
+      $("#pocc_nextSteps").value = mod.completion.nextSteps;
+    }
+    applyModuleDefaults(modules[0]);
+
+    $("#pocc_module").addEventListener("change", function () {
+      var m = modules.filter(function (x) { return x.label === $("#pocc_module").value; })[0];
+      if (m) applyModuleDefaults(m);
+    });
+
+    var linkSel = $("#pocc_linkProject");
+    if (linkSel) {
+      linkSel.addEventListener("change", function () {
+        linkedProject = findProject(linkSel.value);
+        if (!linkedProject) return;
+        $("#pocc_client").value = linkedProject.client;
+        $("#pocc_projectName").value = linkedProject.projectName;
+        $("#pocc_owner").value = linkedProject.owner || "";
+        $("#pocc_startDate").value = linkedProject.startDate || "";
+        var matchMod = modules.filter(function (m) { return (linkedProject.modules || []).indexOf(m.dataModule) !== -1; })[0];
+        if (matchMod) { $("#pocc_module").value = matchMod.label; applyModuleDefaults(matchMod); }
+      });
+    }
+
+    $("#modalCloseBtn").addEventListener("click", closeModal);
+    $("#btnCancelPocc").addEventListener("click", closeModal);
+
+    $("#pocCompletionForm").addEventListener("submit", function (e) {
+      e.preventDefault();
+      var selectedMod = modules.filter(function (x) { return x.label === $("#pocc_module").value; })[0] || modules[0];
+      var metrics = selectedMod.completion.metricFields.map(function (m) {
+        var input = $('[data-metric-key="' + m.key + '"]');
+        return { label: m.label, value: input ? input.value.trim() : "" };
+      });
+
+      var fields = {
+        client: $("#pocc_client").value.trim(),
+        projectName: $("#pocc_projectName").value.trim(),
+        owner: $("#pocc_owner").value.trim(),
+        startDate: $("#pocc_startDate").value,
+        completionDate: $("#pocc_completionDate").value,
+        moduleLabel: selectedMod.label,
+        metrics: metrics,
+        findings: $("#pocc_findings").value,
+        recommendation: $("#pocc_recommendation").value.trim(),
+        nextSteps: $("#pocc_nextSteps").value
+      };
+      if (!fields.client || !fields.projectName) { alert("Client Name and Project Name are required."); return; }
+
+      closeModal();
+      Reports.pocCompletionReport(fields);
     });
   }
 
