@@ -179,6 +179,7 @@ var ExcelIO = (function () {
         cloudProvider: cloudProvider,
         infrastructureOwnership: infra || "IDfy",
         owner: String(row["Owner"] || "").trim(),
+        ownerEmail: "",
         startDate: startDate,
         targetDate: excelDateToStr(row["Target Date"]),
         status: statusKey || "backlog",

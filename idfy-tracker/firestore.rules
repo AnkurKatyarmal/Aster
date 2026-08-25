@@ -10,12 +10,10 @@ service cloud.firestore {
         && exists(/databases/$(database)/documents/users/$(request.auth.uid))
         && myProfile().status == 'approved';
     }
-    function isEditor() {
-      return isApproved() && (myProfile().role == 'editor' || myProfile().role == 'admin');
-    }
-    function isAdmin() {
-      return isApproved() && myProfile().role == 'admin';
-    }
+    function myRole() { return myProfile().role; }
+    function isAdmin() { return isApproved() && myRole() == 'admin'; }
+    function isMember() { return isApproved() && myRole() == 'member'; }
+    function isIntern() { return isApproved() && myRole() == 'intern'; }
 
     // IMPORTANT: keep this list identical to ADMIN_EMAILS in
     // js/firebase-config.js. It only matters for a user's very first
@@ -28,7 +26,8 @@ service cloud.firestore {
 
     match /users/{uid} {
       // Read your own profile always; read anyone's once you're approved
-      // (needed for the admin's Access Requests / All Users lists).
+      // (needed for the admin/member "assign owner" pickers and the
+      // Access Requests / All Users lists).
       allow read: if request.auth != null && (request.auth.uid == uid || isApproved());
 
       // A user may only ever create THEIR OWN doc, and only in one of two
@@ -40,7 +39,7 @@ service cloud.firestore {
         (
           !isBootstrapAdminEmail()
           && request.resource.data.status == 'pending'
-          && request.resource.data.role in ['viewer', 'editor', 'viewer_download']
+          && request.resource.data.role in ['viewer', 'member', 'intern', 'viewer_download']
         ) || (
           isBootstrapAdminEmail()
           && request.resource.data.status == 'approved'
@@ -54,11 +53,35 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
-    // Any approved user (any role) can read all projects.
-    // Only Editor or Admin can write.
+    // Projects: an admin can read/write any project. A member can create a
+    // project only as its own owner, and can only edit/delete projects they
+    // already own. Interns never write here directly — their proposals go
+    // through /pendingChanges and only become real writes once an admin or
+    // the project's owner applies the approved change (as that same admin
+    // or owning member, so this same rule still governs the actual write).
     match /projects/{projectId} {
       allow read: if isApproved();
-      allow write: if isEditor();
+      allow create: if isAdmin()
+        || (isMember() && request.resource.data.ownerEmail == request.auth.token.email);
+      allow update, delete: if isAdmin()
+        || (isMember() && resource.data.ownerEmail == request.auth.token.email);
+    }
+
+    // Pending changes: an intern can create their own proposal (status
+    // must start "pending" and be attributed to themselves — no one can
+    // submit a change on someone else's behalf or pre-mark it approved).
+    // Any approved user can read the queue (the app itself filters what
+    // each role actually sees). Only an admin, or the member matching
+    // targetOwnerEmail, can update a proposal's status (approve/reject).
+    // Only an admin can delete a proposal outright.
+    match /pendingChanges/{changeId} {
+      allow read: if isApproved();
+      allow create: if isIntern()
+        && request.resource.data.submittedBy == request.auth.token.email
+        && request.resource.data.status == 'pending';
+      allow update: if isAdmin()
+        || (isMember() && resource.data.targetOwnerEmail == request.auth.token.email);
+      allow delete: if isAdmin();
     }
   }
 }

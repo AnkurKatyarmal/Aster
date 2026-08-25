@@ -79,15 +79,14 @@ server-side. You can add more admins later by approving someone as Admin
 from the Access Requests page.
 
 From then on, everyone else who signs in lands in **Access Requests** (in
-your sidebar) for you to approve as:
-- **Editor** — full add/edit/delete on projects and activities
-- **Viewer** — read-only, can't download reports or export data
-- **Viewer + Download** — read-only, but can generate/download reports and export JSON
+your sidebar) for you to approve as one of five roles — see "Roles and the
+maker-checker workflow" below for what each one can actually do.
 
-> **On notifications:** the admin sees a live badge on "Access Requests"
-> while the app is open, and it updates without a refresh. True push or
-> email notifications (so you'd be notified even with the app closed) need
-> a Firebase Cloud Function + an email service (e.g. SendGrid) on Firebase's
+> **On notifications:** the admin (and members, for changes on their own
+> projects) sees a live badge on "Access Requests" / "Approvals" while the
+> app is open, and it updates without a refresh. True push or email
+> notifications (so you'd be notified even with the app closed) need a
+> Firebase Cloud Function + an email service (e.g. SendGrid) on Firebase's
 > paid Blaze plan — happy to wire that up as a follow-up if you want it.
 
 ---
@@ -157,7 +156,7 @@ css/
     styles.css              Design system incl. dark theme
 js/
     firebase-config.js      Your Firebase project keys (edit this)
-    auth.js                 Google sign-in, approval workflow, role management
+    auth.js                 Google sign-in, sign-in approval, roles, maker-checker pending-changes queue
     storage.js              localStorage (local mode) / Firestore (cloud mode)
     data.js                 constants, date helpers, waiting/duration calculations, sample data
     kanban.js               Kanban board rendering + drag-and-drop
@@ -179,17 +178,56 @@ js/
 - Waiting days for an unresolved request = today − requested date. Once a
   `Received Date` is filled in, it locks in as received date − requested date.
 
-## Roles and what they can do
+## Roles and the maker-checker workflow
 
-| | Admin | Editor | Viewer + Download | Viewer |
-|---|---|---|---|---|
-| View everything | ✅ | ✅ | ✅ | ✅ |
-| Add/edit/delete projects & activities | ✅ | ✅ | ❌ | ❌ |
-| Drag cards on Kanban | ✅ | ✅ | ❌ | ❌ |
-| Download reports / export JSON | ✅ | ✅ | ✅ | ❌ |
-| Import JSON | ✅ | ✅ | ❌ | ❌ |
-| Approve/reject access requests | ✅ | ❌ | ❌ | ❌ |
-| Reset to sample data / clear all data | ✅ | ❌ | ❌ | ❌ |
+| | Admin | Team Member | Intern | Viewer + Download | Viewer |
+|---|---|---|---|---|---|
+| View everything | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Add/edit/delete **their own** projects & activities | ✅ (any project) | ✅ (only projects they own) | 🕓 proposal only | ❌ | ❌ |
+| Drag cards on Kanban | ✅ any project | ✅ only projects they own | ❌ (propose an edit instead) | ❌ | ❌ |
+| Download reports / export data | ✅ | ✅ | ❌ | ✅ | ❌ |
+| Import Excel/JSON, reset/clear all data | ✅ | ❌ | ❌ | ❌ | ❌ |
+| Approve/reject new sign-ins | ✅ | ❌ | ❌ | ❌ | ❌ |
+| Approve/reject proposed changes | ✅ (any) | ✅ (only for projects they own) | ❌ (sees their own submission status only) | ❌ | ❌ |
 
 In local mode (no Firebase configured), everyone has full Admin-level access
-since there's no login.
+since there's no login and no concept of separate users.
+
+### Project ownership
+
+Every project has an **owner** — a specific Admin or Team Member. A Team
+Member can create new projects (always owned by themselves) and can only
+edit, delete, or add activities on projects they own. On the Kanban board,
+a Team Member can only drag cards for projects they own — other cards show
+as read-only, with a banner explaining why.
+
+An Admin can reassign a project's owner at any time via **Edit Project**.
+Projects added before this feature existed (or imported via Excel/JSON
+without an owner) show as "Unassigned" until an Admin assigns one.
+
+### Interns and maker-checker
+
+An Intern can do everything a Team Member can *in the UI* — add a project,
+edit one, log activities, propose a deletion — but none of it goes live
+immediately. Instead:
+
+1. The Intern's submission is saved as a **pending change**.
+2. It's routed to whoever should review it: the Admin, or — for edits to an
+   existing project — that project's actual owner. (For a brand-new project,
+   the Intern picks who it should belong to; that person or an Admin reviews it.)
+3. That reviewer sees it on the **Approvals** page, with a live badge in the
+   sidebar, and can **Approve** (the change is applied to live data
+   immediately) or **Reject** (discarded, nothing changes).
+4. The Intern can check the status of everything they've submitted on the
+   same Approvals page — it just shows a read-only history for them, no
+   review controls.
+
+This is enforced by the Firestore security rules themselves, not just the
+UI — an Intern's account literally cannot write to `projects` directly, only
+to a separate `pendingChanges` collection, and only an Admin or the correct
+project's owner can write the corresponding live update.
+
+> **Heads up:** bulk operations (Excel/JSON import, Reset to sample data,
+> Clear all data) are Admin-only in cloud mode, since they'd otherwise let
+> any Team Member overwrite the *entire shared dataset* — not just their own
+> projects.

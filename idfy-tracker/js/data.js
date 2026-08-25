@@ -469,6 +469,7 @@ var Data = (function () {
       ]
     });
 
+    projects.forEach(function (p) { if (p.ownerEmail == null) p.ownerEmail = ""; });
     return projects;
   }
 

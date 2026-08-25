@@ -175,6 +175,7 @@ var Storage = (function () {
       if (p.modules && !Array.isArray(p.modules)) errors.push("Project #" + (i + 1) + " \"modules\" must be an array.");
       if (p.activities && !Array.isArray(p.activities)) errors.push("Project #" + (i + 1) + " \"activities\" must be an array.");
       if (!p.id) p.id = Data.generateId("proj");
+      if (p.ownerEmail == null) p.ownerEmail = "";
       if (!p.activities) p.activities = [];
       if (!p.auditLog) p.auditLog = [{ date: Data.todayStr(), text: "Imported" }];
       (p.activities || []).forEach(function (a) { if (!a.id) a.id = Data.generateId("act"); });

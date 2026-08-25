@@ -40,9 +40,29 @@ var App = (function () {
   }
 
   function perms() {
-    if (!Auth.isEnabled()) return { edit: true, download: true, admin: true };
+    if (!Auth.isEnabled()) return { canAddProjects: true, download: true, admin: true, isMember: false, isIntern: false, email: null };
     var s = Auth.state();
-    return { edit: s.canEdit, download: s.canDownload, admin: s.isAdmin };
+    return { canAddProjects: s.canAddProjects, download: s.canDownload, admin: s.isAdmin, isMember: s.isMember, isIntern: s.isIntern, email: s.email };
+  }
+
+  // Can this user edit/delete THIS specific project directly (no approval needed)?
+  function canEditProject(project) {
+    if (!Auth.isEnabled()) return true; // local mode: everyone has full access
+    var s = Auth.state();
+    if (s.isAdmin) return true;
+    if (s.isMember) return !!(project && project.ownerEmail && project.ownerEmail === s.email);
+    return false;
+  }
+
+  // Interns can't write directly, but they CAN open the edit/activity UI —
+  // their submission just becomes a pending proposal instead of a live write.
+  function isProposing() {
+    return Auth.isEnabled() && Auth.state().isIntern;
+  }
+
+  function ownerDisplay(project) {
+    if (!project || !project.ownerEmail) return "Unassigned";
+    return project.owner || project.ownerEmail;
   }
 
   // ---------------------------------------------------------------- persistence helpers
@@ -83,7 +103,7 @@ var App = (function () {
   function boot() {
     initTheme();
     $("#btnAddProject").addEventListener("click", function () {
-      if (!perms().edit) return alert("You have view-only access and can't add projects.");
+      if (!perms().canAddProjects) return alert("You don't have permission to add projects.");
       openProjectForm(null);
     });
     attachModalBackdrop();
@@ -92,7 +112,8 @@ var App = (function () {
     if (Auth.isEnabled()) {
       $("#sidebarFooter").textContent = "Connected to shared cloud storage";
       Auth.onChange(handleAuthState);
-      Auth.onPendingCountChange(updatePendingBadge);
+      Auth.onPendingUserCountChange(updateUserPendingBadge);
+      Auth.onPendingChangeCountChange(updateChangePendingBadge);
       Auth.init();
     } else {
       $("#sidebarFooter").textContent = "Data stored locally in this browser (local mode)";
@@ -100,8 +121,15 @@ var App = (function () {
     }
   }
 
-  function updatePendingBadge(count) {
-    var badge = $("#pendingBadge");
+  function updateUserPendingBadge(count) {
+    var badge = $("#pendingUserBadge");
+    if (!badge) return;
+    if (count > 0) { badge.textContent = count; badge.style.display = "inline-block"; }
+    else { badge.style.display = "none"; }
+  }
+
+  function updateChangePendingBadge(count) {
+    var badge = $("#pendingChangeBadge");
     if (!badge) return;
     if (count > 0) { badge.textContent = count; badge.style.display = "inline-block"; }
     else { badge.style.display = "none"; }
@@ -167,6 +195,8 @@ var App = (function () {
       $("#btnSignOut").addEventListener("click", function () { Auth.signOut(); });
 
       $(".nav-admin-only").style.display = authState.isAdmin ? "flex" : "none";
+      var showApprovals = authState.isAdmin || authState.role === "member" || authState.role === "intern";
+      $(".nav-approvals").style.display = showApprovals ? "flex" : "none";
     }
 
     attachSidebarNavOnce();
@@ -216,16 +246,23 @@ var App = (function () {
     $("#drawerBackdrop").addEventListener("click", function (e) { if (e.target.id === "drawerBackdrop") closeDrawer(); });
   }
 
+  // Bulk operations (import replaces the WHOLE shared dataset, reset/clear
+  // wipe everyone's projects) are admin-only in cloud mode, since a member
+  // or intern shouldn't be able to affect other members' projects this way.
+  function canBulkManage() {
+    return !Auth.isEnabled() || Auth.state().isAdmin;
+  }
+
   function attachSettingsButtons() {
     $("#btnExport").addEventListener("click", function () { Storage.exportJSON(state.projects); });
     $("#btnDownloadTemplate").addEventListener("click", function () { Storage.downloadTemplate(); });
     $("#btnDownloadExcelTemplate").addEventListener("click", function () { ExcelIO.downloadTemplate(); });
     $("#btnImport").addEventListener("click", function () {
-      if (!perms().edit) return alert("You have view-only access and can't import data.");
+      if (!canBulkManage()) return alert("Only an admin can import data — it replaces the entire shared dataset.");
       $("#importFileInput").click();
     });
     $("#btnImportExcel").addEventListener("click", function () {
-      if (!perms().edit) return alert("You have view-only access and can't import data.");
+      if (!canBulkManage()) return alert("Only an admin can import data — it replaces the entire shared dataset.");
       $("#importExcelInput").click();
     });
     $("#importFileInput").addEventListener("change", function (e) {
@@ -249,13 +286,13 @@ var App = (function () {
       e.target.value = "";
     });
     $("#btnResetSample").addEventListener("click", function () {
-      if (!perms().admin && Auth.isEnabled()) return alert("Only an admin can reset to sample data.");
+      if (!canBulkManage()) return alert("Only an admin can reset to sample data.");
       if (confirm("Replace current data with fresh sample data? This cannot be undone.")) {
         replaceAllProjects(Data.sampleProjects());
       }
     });
     $("#btnClearAll").addEventListener("click", function () {
-      if (!perms().admin && Auth.isEnabled()) return alert("Only an admin can clear all data.");
+      if (!canBulkManage()) return alert("Only an admin can clear all data.");
       if (confirm("Delete ALL projects and activities? This cannot be undone.")) {
         replaceAllProjects([]);
       }
@@ -301,15 +338,18 @@ var App = (function () {
   function renderPage() {
     var main = $("#mainContent");
     if (!main) return;
+    if (state.page !== "approvals" && unsubApprovals) { unsubApprovals(); unsubApprovals = null; }
     if (state.page === "dashboard") return renderDashboard(main);
     if (state.page === "kanban") return renderKanbanPage(main);
     if (state.page === "projects") return renderProjectsPage(main);
     if (state.page === "timeline") return renderTimelinePage(main);
     if (state.page === "analytics") return renderAnalyticsPage(main);
     if (state.page === "reports") return renderReportsPage(main);
+    if (state.page === "approvals") return renderApprovalsPage(main);
     if (state.page === "access") return renderAccessPage(main);
     if (state.page === "settings") return renderSettingsPage(main);
   }
+  var unsubApprovals = null;
 
   // ---------------------------------------------------------------- dashboard
   function renderDashboard(main) {
@@ -334,7 +374,7 @@ var App = (function () {
 
     var html = '<div class="page-header"><h1>IDfy Project Tracker</h1><p class="page-subtitle">Portfolio overview and delivery health</p></div>';
     if (!projects.length) {
-      html += '<div class="empty-state">No projects yet. ' + (perms().edit ? 'Use <strong>+ Add Project</strong>, or go to Settings to import data or load sample data.' : 'Ask an admin to add projects or approve your edit access.') + '</div>';
+      html += '<div class="empty-state">No projects yet. ' + (perms().canAddProjects ? 'Use <strong>+ Add Project</strong>, or go to Settings to import data or load sample data.' : 'Ask an admin to add projects or grant you access.') + '</div>';
       main.innerHTML = html;
       return;
     }
@@ -357,7 +397,7 @@ var App = (function () {
 
     html += '<div class="section-title">At a Glance — Kanban</div><div id="dashboardKanban"></div>';
     main.innerHTML = html;
-    Kanban.render($("#dashboardKanban"), projects.slice(0, 30), perms());
+    Kanban.render($("#dashboardKanban"), projects.slice(0, 30), canEditProject);
   }
 
   // ---------------------------------------------------------------- kanban page
@@ -394,13 +434,14 @@ var App = (function () {
     html += '<div id="kanbanContainer"></div>';
     main.innerHTML = html;
     attachFilterBar(main);
-    Kanban.render($("#kanbanContainer"), filteredProjects(), perms());
+    Kanban.render($("#kanbanContainer"), filteredProjects(), canEditProject);
   }
 
   function updateProjectStatus(id, newStatus) {
-    if (!perms().edit) { alert("You have view-only access and can't change project status."); renderPage(); return; }
     var project = findProject(id);
-    if (!project || project.status === newStatus) return;
+    if (!project) return;
+    if (!canEditProject(project)) { alert(isProposing() ? "Interns can't change status directly — open the project and use Edit Project to propose a status change." : "You don't have edit access to this project."); renderPage(); return; }
+    if (project.status === newStatus) return;
     var oldLabel = (Data.STATUSES.filter(function (s) { return s.key === project.status; })[0] || {}).label || project.status;
     var newLabel = (Data.STATUSES.filter(function (s) { return s.key === newStatus; })[0] || {}).label || newStatus;
     project.status = newStatus;
@@ -414,12 +455,11 @@ var App = (function () {
     var html = '<div class="page-header"><h1>Projects</h1><p class="page-subtitle">All projects in a sortable table view</p></div>';
     html += filterBarHtml();
     html += '<div class="table-wrap"><table class="data-table">';
-    html += "<thead><tr><th>Client</th><th>Project</th><th>Type</th><th>Environment</th><th>Modules</th><th>Status</th><th>Health</th><th>Waiting</th><th></th></tr></thead><tbody>";
+    html += "<thead><tr><th>Client</th><th>Project</th><th>Type</th><th>Owner</th><th>Environment</th><th>Modules</th><th>Status</th><th>Health</th><th>Waiting</th><th></th></tr></thead><tbody>";
 
     var projects = filteredProjects();
-    var p2 = perms();
     if (!projects.length) {
-      html += '<tr><td colspan="9" class="empty-cell">No projects match the current filters.</td></tr>';
+      html += '<tr><td colspan="10" class="empty-cell">No projects match the current filters.</td></tr>';
     } else {
       projects.forEach(function (p) {
         var a = Data.calcProjectAnalytics(p);
@@ -428,12 +468,13 @@ var App = (function () {
         html += "<td>" + esc(p.client) + "</td>";
         html += '<td><a href="#" class="row-link" data-open-project="' + p.id + '">' + esc(p.projectName) + "</a></td>";
         html += '<td><span class="badge ' + Kanban.typeBadgeClass(p.projectType) + '">' + p.projectType + "</span></td>";
+        html += "<td>" + esc(ownerDisplay(p)) + "</td>";
         html += "<td>" + esc(Kanban.envLabel(p)) + "</td>";
         html += '<td><div class="chip-row">' + Kanban.moduleChips(p.modules) + "</div></td>";
         html += "<td>" + esc(statusLabel) + "</td>";
         html += '<td><span class="health-dot ' + Kanban.healthDotClass(p.health) + '"></span> ' + esc(p.health) + "</td>";
         html += "<td>" + (a.totalWaiting > 0 ? a.totalWaiting + "d" : "—") + "</td>";
-        html += "<td>" + (p2.edit ? '<button class="link-btn link-danger" data-delete-project="' + p.id + '">Delete</button>' : "") + "</td>";
+        html += "<td>" + (canEditProject(p) ? '<button class="link-btn link-danger" data-delete-project="' + p.id + '">Delete</button>' : "") + "</td>";
         html += "</tr>";
       });
     }
@@ -531,84 +572,124 @@ var App = (function () {
   function openNewPocModal() {
     var modules = PocTemplates.list();
     var mod = modules[0];
+    var s = Auth.isEnabled() ? Auth.state() : null;
+    var proposing = isProposing();
+    var showOwnerPicker = Auth.isEnabled() && s && (s.isAdmin || proposing);
 
-    var html = '<div class="modal-header"><h2>New POC — Kickoff Document</h2><button class="drawer-close" id="modalCloseBtn">&times;</button></div>';
-    html += '<form id="pocForm" class="form-grid">';
-    html += formField("Module", selectHtml("poc_module", modules.map(function (m) { return m.label; }), mod.label, true));
-    html += formField("Client Name", '<input type="text" id="poc_client" required>');
-    html += formField("Project Name", '<input type="text" id="poc_projectName" placeholder="e.g. Consent Governance POC" required>');
-    html += formField("POC Owner", '<input type="text" id="poc_owner">');
-    html += formField("Environment", selectHtml("poc_environment", Data.ENV_TYPES, "SaaS", true));
-    html += formField("Cloud Provider", selectHtml("poc_cloudProvider", Data.CLOUD_PROVIDERS, "AWS"), "poc_cloudProviderRow");
-    html += formField("Start Date", '<input type="date" id="poc_startDate" value="' + Data.todayStr() + '" required>');
-    html += formField("Target Completion", '<input type="date" id="poc_targetDate">');
-    html += formField("Objective", '<textarea id="poc_objective" rows="2">' + esc(mod.kickoff.objective) + "</textarea>", null, true);
-    html += formField("Scope (one item per line)", '<textarea id="poc_scope" rows="5">' + esc(mod.kickoff.scope) + "</textarea>", null, true);
-    html += formField("Indicative Timeline (one item per line)", '<textarea id="poc_timeline" rows="4">' + esc(mod.kickoff.timeline) + "</textarea>", null, true);
-    html += formField("Success Criteria (one item per line)", '<textarea id="poc_successCriteria" rows="4">' + esc(mod.kickoff.successCriteria) + "</textarea>", null, true);
-    html += formField("Assumptions & Exclusions (one item per line)", '<textarea id="poc_assumptions" rows="4">' + esc(mod.kickoff.assumptions) + "</textarea>", null, true);
-    html += '<div class="form-field form-field-full"><label class="ms-option" style="text-transform:none;"><input type="checkbox" id="poc_alsoCreate" checked> Also add this as a new POC project in the tracker</label></div>';
-    html += '<div class="form-actions"><button type="button" class="btn btn-ghost" id="btnCancelPoc">Cancel</button><button type="submit" class="btn btn-primary">Generate Kickoff Document</button></div>';
-    html += "</form>";
-    openModal(html);
+    function renderForm(ownerCandidates) {
+      var html = '<div class="modal-header"><h2>' + (proposing ? "Propose New POC — Kickoff Document" : "New POC — Kickoff Document") + '</h2><button class="drawer-close" id="modalCloseBtn">&times;</button></div>';
+      html += '<form id="pocForm" class="form-grid">';
+      html += formField("Module", selectHtml("poc_module", modules.map(function (m) { return m.label; }), mod.label, true));
+      html += formField("Client Name", '<input type="text" id="poc_client" required>');
+      html += formField("Project Name", '<input type="text" id="poc_projectName" placeholder="e.g. Consent Governance POC" required>');
 
-    function toggleCloudRow() { var row = $("#poc_cloudProviderRow"); if (row) row.style.display = $("#poc_environment").value === "Cloud" ? "" : "none"; }
-    $("#poc_environment").addEventListener("change", toggleCloudRow);
-    toggleCloudRow();
+      if (showOwnerPicker) {
+        var options = ownerCandidates.map(function (u) { return '<option value="' + esc(u.email) + '" data-name="' + esc(u.displayName) + '">' + esc(u.displayName) + " (" + esc(u.email) + ")</option>"; }).join("");
+        html += formField(proposing ? "Assign to (who will review/own this)" : "POC Owner", '<select id="poc_ownerEmail" required><option value="">— Select —</option>' + options + "</select>");
+      } else {
+        html += formField("POC Owner", '<input type="text" value="' + esc(s ? s.profile.displayName : "You") + '" disabled>');
+      }
 
-    $("#poc_module").addEventListener("change", function () {
-      var m = modules.filter(function (x) { return x.label === $("#poc_module").value; })[0];
-      if (!m) return;
-      $("#poc_objective").value = m.kickoff.objective;
-      $("#poc_scope").value = m.kickoff.scope;
-      $("#poc_timeline").value = m.kickoff.timeline;
-      $("#poc_successCriteria").value = m.kickoff.successCriteria;
-      $("#poc_assumptions").value = m.kickoff.assumptions;
-    });
+      html += formField("Environment", selectHtml("poc_environment", Data.ENV_TYPES, "SaaS", true));
+      html += formField("Cloud Provider", selectHtml("poc_cloudProvider", Data.CLOUD_PROVIDERS, "AWS"), "poc_cloudProviderRow");
+      html += formField("Start Date", '<input type="date" id="poc_startDate" value="' + Data.todayStr() + '" required>');
+      html += formField("Target Completion", '<input type="date" id="poc_targetDate">');
+      html += formField("Objective", '<textarea id="poc_objective" rows="2">' + esc(mod.kickoff.objective) + "</textarea>", null, true);
+      html += formField("Scope (one item per line)", '<textarea id="poc_scope" rows="5">' + esc(mod.kickoff.scope) + "</textarea>", null, true);
+      html += formField("Indicative Timeline (one item per line)", '<textarea id="poc_timeline" rows="4">' + esc(mod.kickoff.timeline) + "</textarea>", null, true);
+      html += formField("Success Criteria (one item per line)", '<textarea id="poc_successCriteria" rows="4">' + esc(mod.kickoff.successCriteria) + "</textarea>", null, true);
+      html += formField("Assumptions & Exclusions (one item per line)", '<textarea id="poc_assumptions" rows="4">' + esc(mod.kickoff.assumptions) + "</textarea>", null, true);
+      if (!proposing) html += '<div class="form-field form-field-full"><label class="ms-option" style="text-transform:none;"><input type="checkbox" id="poc_alsoCreate" checked> Also add this as a new POC project in the tracker</label></div>';
+      else html += '<div class="form-field form-field-full"><div class="empty-state">The project and its kickoff details will be submitted for approval. The document below generates immediately either way — approval only affects whether it shows up as a live project in the tracker.</div></div>';
+      html += '<div class="form-actions"><button type="button" class="btn btn-ghost" id="btnCancelPoc">Cancel</button><button type="submit" class="btn btn-primary">Generate Kickoff Document</button></div>';
+      html += "</form>";
+      openModal(html);
 
-    $("#modalCloseBtn").addEventListener("click", closeModal);
-    $("#btnCancelPoc").addEventListener("click", closeModal);
+      function toggleCloudRow() { var row = $("#poc_cloudProviderRow"); if (row) row.style.display = $("#poc_environment").value === "Cloud" ? "" : "none"; }
+      $("#poc_environment").addEventListener("change", toggleCloudRow);
+      toggleCloudRow();
 
-    $("#pocForm").addEventListener("submit", function (e) {
-      e.preventDefault();
-      var selectedMod = modules.filter(function (x) { return x.label === $("#poc_module").value; })[0] || mod;
-      var environment = $("#poc_environment").value;
-      var cloudProvider = environment === "Cloud" ? $("#poc_cloudProvider").value : "";
+      $("#poc_module").addEventListener("change", function () {
+        var m = modules.filter(function (x) { return x.label === $("#poc_module").value; })[0];
+        if (!m) return;
+        $("#poc_objective").value = m.kickoff.objective;
+        $("#poc_scope").value = m.kickoff.scope;
+        $("#poc_timeline").value = m.kickoff.timeline;
+        $("#poc_successCriteria").value = m.kickoff.successCriteria;
+        $("#poc_assumptions").value = m.kickoff.assumptions;
+      });
 
-      var fields = {
-        client: $("#poc_client").value.trim(),
-        projectName: $("#poc_projectName").value.trim(),
-        owner: $("#poc_owner").value.trim(),
-        environment: environment === "Cloud" ? ("Cloud — " + cloudProvider) : environment,
-        startDate: $("#poc_startDate").value,
-        targetDate: $("#poc_targetDate").value,
-        moduleLabel: selectedMod.label,
-        objective: $("#poc_objective").value.trim(),
-        scope: $("#poc_scope").value,
-        timeline: $("#poc_timeline").value,
-        successCriteria: $("#poc_successCriteria").value,
-        assumptions: $("#poc_assumptions").value
-      };
+      $("#modalCloseBtn").addEventListener("click", closeModal);
+      $("#btnCancelPoc").addEventListener("click", closeModal);
 
-      if (!fields.client || !fields.projectName) { alert("Client Name and Project Name are required."); return; }
+      $("#pocForm").addEventListener("submit", function (e) {
+        e.preventDefault();
+        var selectedMod = modules.filter(function (x) { return x.label === $("#poc_module").value; })[0] || mod;
+        var environment = $("#poc_environment").value;
+        var cloudProvider = environment === "Cloud" ? $("#poc_cloudProvider").value : "";
 
-      if ($("#poc_alsoCreate").checked && perms().edit) {
-        var newProject = {
-          id: Data.generateId("proj"),
+        var ownerEmail, ownerName;
+        if (showOwnerPicker) {
+          var sel = $("#poc_ownerEmail");
+          var opt = sel.options[sel.selectedIndex];
+          if (!sel.value) { alert("Please assign an owner."); return; }
+          ownerEmail = sel.value; ownerName = opt ? opt.getAttribute("data-name") : sel.value;
+        } else {
+          ownerEmail = s ? s.email : ""; ownerName = s ? s.profile.displayName : "";
+        }
+
+        var fields = {
+          client: $("#poc_client").value.trim(),
+          projectName: $("#poc_projectName").value.trim(),
+          owner: ownerName,
+          environment: environment === "Cloud" ? ("Cloud — " + cloudProvider) : environment,
+          startDate: $("#poc_startDate").value,
+          targetDate: $("#poc_targetDate").value,
+          moduleLabel: selectedMod.label,
+          objective: $("#poc_objective").value.trim(),
+          scope: $("#poc_scope").value,
+          timeline: $("#poc_timeline").value,
+          successCriteria: $("#poc_successCriteria").value,
+          assumptions: $("#poc_assumptions").value
+        };
+
+        if (!fields.client || !fields.projectName) { alert("Client Name and Project Name are required."); return; }
+
+        var newProjectPayload = {
           client: fields.client,
           projectName: fields.projectName,
           projectType: "POC",
           environment: environment,
           cloudProvider: cloudProvider,
           infrastructureOwnership: "IDfy",
-          owner: fields.owner,
+          owner: ownerName,
+          ownerEmail: ownerEmail,
           startDate: fields.startDate,
           targetDate: fields.targetDate,
           status: "planned",
           health: "ON TRACK",
           modules: [selectedMod.dataModule],
-          description: fields.objective,
-          activities: [{
+          description: fields.objective
+        };
+
+        if (proposing) {
+          Auth.submitPendingChange({
+            type: "create_project",
+            targetProjectId: null,
+            targetOwnerEmail: ownerEmail,
+            clientLabel: fields.client + " — " + fields.projectName,
+            payload: newProjectPayload
+          }).then(function () {
+            closeModal();
+            Reports.pocKickoffReport(fields);
+            alert("Project submitted for approval. The kickoff document has still been generated for you to share.");
+          }).catch(function (err) { alert("Couldn't submit: " + err.message); });
+          return;
+        }
+
+        if (!showOwnerPicker || $("#poc_alsoCreate").checked) {
+          newProjectPayload.id = Data.generateId("proj");
+          newProjectPayload.activities = [{
             id: Data.generateId("act"),
             date: fields.startDate,
             activityType: "MEETING",
@@ -618,17 +699,20 @@ var App = (function () {
             dependencySide: "Internal",
             requestedBy: "", requestedDate: "", expectedDate: "", receivedDate: "",
             status: "COMPLETED", impact: "", relatedPhase: "Kickoff", notes: ""
-          }],
-          auditLog: [{ date: Data.todayStr(), text: "Project created from New POC template (" + selectedMod.label + ")" }]
-        };
-        state.projects.push(newProject);
-        persistProject(newProject);
-      }
+          }];
+          newProjectPayload.auditLog = [{ date: Data.todayStr(), text: "Project created from New POC template (" + selectedMod.label + ")" }];
+          state.projects.push(newProjectPayload);
+          persistProject(newProjectPayload);
+        }
 
-      closeModal();
-      Reports.pocKickoffReport(fields);
-      if (["dashboard", "kanban", "projects"].indexOf(state.page) !== -1) renderPage();
-    });
+        closeModal();
+        Reports.pocKickoffReport(fields);
+        if (["dashboard", "kanban", "projects"].indexOf(state.page) !== -1) renderPage();
+      });
+    }
+
+    if (showOwnerPicker) Auth.listOwnerCandidates(renderForm);
+    else renderForm([]);
   }
 
   // ---------------------------------------------------------------- POC templates: Completion Report
@@ -720,6 +804,121 @@ var App = (function () {
     });
   }
 
+  // ---------------------------------------------------------------- approvals (maker-checker)
+  var CHANGE_TYPE_LABELS = {
+    create_project: "New Project", edit_project: "Edit Project", delete_project: "Delete Project",
+    add_activity: "Add Activity", edit_activity: "Edit Activity", delete_activity: "Delete Activity"
+  };
+
+  function describeChangePayload(change) {
+    if (change.type === "create_project" || change.type === "edit_project") {
+      return "Status: " + esc(change.payload.status) + " · Health: " + esc(change.payload.health) + (change.payload.description ? " · " + esc(change.payload.description) : "");
+    }
+    if (change.type === "add_activity" || change.type === "edit_activity") {
+      return esc(change.payload.activityType) + " — " + esc(change.payload.description);
+    }
+    if (change.type === "delete_activity") return "Delete: " + esc(change.payload.description);
+    if (change.type === "delete_project") return "Delete this project and all its activity history";
+    return "";
+  }
+
+  function applyApprovedChange(change) {
+    if (change.type === "create_project") {
+      var newProject = Object.assign({}, change.payload, {
+        id: Data.generateId("proj"),
+        activities: [],
+        auditLog: [{ date: Data.todayStr(), text: "Project created (approved from " + change.submittedByName + "'s proposal)" }]
+      });
+      state.projects.push(newProject);
+      persistProject(newProject);
+      return;
+    }
+    var project = findProject(change.targetProjectId);
+    if (!project) { alert("The target project for this change no longer exists."); return; }
+
+    if (change.type === "edit_project") {
+      Object.assign(project, change.payload);
+      addAudit(project, "Edit approved (proposed by " + change.submittedByName + ")");
+      persistProject(project);
+    } else if (change.type === "delete_project") {
+      state.projects = state.projects.filter(function (p) { return p.id !== project.id; });
+      persistDelete(project.id);
+    } else if (change.type === "add_activity") {
+      project.activities = project.activities || [];
+      var act = Object.assign({}, change.payload, { id: Data.generateId("act") });
+      project.activities.push(act);
+      addAudit(project, "Activity added (approved from " + change.submittedByName + "'s proposal): " + act.description);
+      persistProject(project);
+    } else if (change.type === "edit_activity") {
+      var target = (project.activities || []).filter(function (a) { return a.id === change.payload.activityId; })[0];
+      if (target) Object.assign(target, change.payload);
+      addAudit(project, "Activity edit approved (proposed by " + change.submittedByName + ")");
+      persistProject(project);
+    } else if (change.type === "delete_activity") {
+      project.activities = (project.activities || []).filter(function (a) { return a.id !== change.payload.activityId; });
+      addAudit(project, "Activity deletion approved (proposed by " + change.submittedByName + "): " + change.payload.description);
+      persistProject(project);
+    }
+  }
+
+  function renderApprovalsPage(main) {
+    if (!Auth.isEnabled()) {
+      main.innerHTML = '<div class="page-header"><h1>Approvals</h1><p class="page-subtitle">Maker-checker queue for proposed changes</p></div>' +
+        '<div class="empty-state">Approvals only apply in cloud mode.</div>';
+      return;
+    }
+    var s = Auth.state();
+    if (!(s.isAdmin || s.role === "member" || s.role === "intern")) {
+      main.innerHTML = '<div class="empty-state">Not applicable to your role.</div>';
+      return;
+    }
+
+    var isReviewer = s.isAdmin || s.role === "member";
+    var html = '<div class="page-header"><h1>Approvals</h1><p class="page-subtitle">' +
+      (isReviewer ? "Review and approve or reject proposed changes" : "Status of the changes you've submitted") + '</p></div>';
+    html += '<div id="approvalsList"></div>';
+    main.innerHTML = html;
+
+    if (unsubApprovals) { unsubApprovals(); unsubApprovals = null; }
+    unsubApprovals = Auth.listPendingChangesFor(s.profile, function (rows) {
+      var el = $("#approvalsList");
+      if (!rows.length) { el.innerHTML = '<div class="empty-state">' + (isReviewer ? "Nothing waiting for your review." : "You haven't submitted any changes yet.") + '</div>'; return; }
+
+      var h = '<div class="table-wrap"><table class="data-table"><thead><tr><th>Type</th><th>Project</th><th>Details</th><th>Submitted By</th><th>Status</th>' + (isReviewer ? "<th></th>" : "") + "</tr></thead><tbody>";
+      rows.forEach(function (c) {
+        h += "<tr>";
+        h += "<td>" + esc(CHANGE_TYPE_LABELS[c.type] || c.type) + "</td>";
+        h += "<td>" + esc(c.clientLabel) + "</td>";
+        h += "<td>" + describeChangePayload(c) + "</td>";
+        h += "<td>" + esc(c.submittedByName) + "</td>";
+        h += "<td>" + Timeline.statusPill((c.status || "pending").toUpperCase()) + "</td>";
+        if (isReviewer) {
+          h += "<td>" + (c.status === "pending"
+            ? '<button class="btn btn-primary btn-sm" data-approve-change="' + c.id + '">Approve</button> <button class="btn btn-ghost btn-sm" data-reject-change="' + c.id + '">Reject</button>'
+            : "") + "</td>";
+        }
+        h += "</tr>";
+      });
+      h += "</tbody></table></div>";
+      el.innerHTML = h;
+
+      $all("[data-approve-change]", el).forEach(function (btn) {
+        btn.addEventListener("click", function () {
+          var change = rows.filter(function (r) { return r.id === btn.getAttribute("data-approve-change"); })[0];
+          if (!change) return;
+          applyApprovedChange(change);
+          Auth.markChangeReviewed(change.id, "approved");
+        });
+      });
+      $all("[data-reject-change]", el).forEach(function (btn) {
+        btn.addEventListener("click", function () {
+          if (!confirm("Reject this proposed change?")) return;
+          Auth.markChangeReviewed(btn.getAttribute("data-reject-change"), "rejected");
+        });
+      });
+    });
+  }
+
   // ---------------------------------------------------------------- access requests (admin) page
   function renderAccessPage(main) {
     if (!Auth.isEnabled()) {
@@ -735,7 +934,7 @@ var App = (function () {
     html += '<div id="pendingSection"></div><div class="section-title">All Users</div><div id="allUsersSection"></div>';
     main.innerHTML = html;
 
-    Auth.listPending(function (rows) {
+    Auth.listPendingUsers(function (rows) {
       var el = $("#pendingSection");
       if (!rows.length) { el.innerHTML = '<div class="empty-state">No pending requests.</div>'; return; }
       var h = '<div class="table-wrap"><table class="data-table"><thead><tr><th>Name</th><th>Email</th><th>Grant Access As</th><th></th></tr></thead><tbody>';
@@ -805,7 +1004,7 @@ var App = (function () {
     html += "<p>Download the template, fill it in (Excel, or Google Sheets — edit there, then <strong>File \u2192 Download \u2192 Microsoft Excel (.xlsx)</strong>), and upload it back here. One row per project on the <strong>Projects</strong> tab, one row per timeline entry on the <strong>Activities</strong> tab, linked by matching Client + Project Name.</p>";
     html += '<div class="settings-actions">';
     html += '<button class="btn btn-secondary" id="btnDownloadExcelTemplate2"' + (p2.download ? "" : " disabled") + '>Download Excel template</button>';
-    html += '<button class="btn btn-primary" id="btnImportExcel2"' + (p2.edit ? "" : " disabled") + '>Import from Excel (.xlsx)</button>';
+    html += '<button class="btn btn-primary" id="btnImportExcel2"' + (canBulkManage() ? "" : " disabled") + '>Import from Excel (.xlsx)</button>';
     html += "</div></div>";
 
     html += '<div class="settings-card"><h3>Advanced: JSON export / import</h3>';
@@ -813,13 +1012,13 @@ var App = (function () {
     html += '<div class="settings-actions">';
     html += '<button class="btn btn-secondary" id="btnDownloadTemplate2"' + (p2.download ? "" : " disabled") + '>Download JSON template</button>';
     html += '<button class="btn btn-secondary" id="btnExport2"' + (p2.download ? "" : " disabled") + '>Export current data (JSON)</button>';
-    html += '<button class="btn btn-secondary" id="btnImport2"' + (p2.edit ? "" : " disabled") + '>Import data (JSON)</button>';
+    html += '<button class="btn btn-secondary" id="btnImport2"' + (canBulkManage() ? "" : " disabled") + '>Import data (JSON)</button>';
     html += "</div></div>";
 
     html += '<div class="settings-card"><h3>Reset</h3>';
     html += '<div class="settings-actions">';
-    html += '<button class="btn btn-secondary" id="btnResetSample2"' + (p2.edit ? "" : " disabled") + '>Reset to sample data</button>';
-    html += '<button class="btn btn-danger" id="btnClearAll2"' + (p2.edit ? "" : " disabled") + '>Clear all data</button>';
+    html += '<button class="btn btn-secondary" id="btnResetSample2"' + (canBulkManage() ? "" : " disabled") + '>Reset to sample data</button>';
+    html += '<button class="btn btn-danger" id="btnClearAll2"' + (canBulkManage() ? "" : " disabled") + '>Clear all data</button>';
     html += "</div></div>";
 
     html += '<div class="settings-card"><h3>Definitions</h3><dl class="def-list">' +
@@ -859,6 +1058,8 @@ var App = (function () {
     var project = findProject(state.selectedProjectId);
     if (!project) { closeDrawer(); return; }
     var p2 = perms();
+    var canDirect = canEditProject(project);
+    var canPropose = isProposing();
     var a = Data.calcProjectAnalytics(project);
     var dep = Data.currentDependency(project);
     var statusLabel = (Data.STATUSES.filter(function (s) { return s.key === project.status; })[0] || {}).label || project.status;
@@ -871,11 +1072,15 @@ var App = (function () {
     html += '<span class="badge ' + Kanban.typeBadgeClass(project.projectType) + '">' + project.projectType + "</span>";
     html += '<span class="pill pill-neutral">Status: ' + esc(statusLabel) + "</span>";
     html += '<span class="health-dot ' + Kanban.healthDotClass(project.health) + '"></span><span class="health-text">' + esc(project.health) + "</span>";
+    html += '<span class="pill pill-neutral">Owner: ' + esc(ownerDisplay(project)) + "</span>";
     html += "</div>";
     html += '<div class="drawer-actions">';
-    if (p2.edit) {
+    if (canDirect) {
       html += '<button class="btn btn-secondary btn-sm" id="btnEditProject">Edit project</button>';
       html += '<button class="btn btn-danger btn-sm" id="btnDeleteProject">Delete project</button>';
+    } else if (canPropose) {
+      html += '<button class="btn btn-secondary btn-sm" id="btnEditProject">Propose edit</button>';
+      html += '<button class="btn btn-danger btn-sm" id="btnDeleteProject">Propose deletion</button>';
     }
     if (p2.download) html += '<button class="btn btn-secondary btn-sm" id="btnDownloadProjectReport">Download report</button>';
     html += "</div></div>";
@@ -886,7 +1091,7 @@ var App = (function () {
     html += infoRow("Project Type", project.projectType);
     html += infoRow("Environment", Kanban.envLabel(project));
     html += infoRow("Infrastructure Ownership", project.infrastructureOwnership);
-    html += infoRow("Project Owner", project.owner);
+    html += infoRow("Project Owner", ownerDisplay(project));
     html += infoRow("Start Date", Data.formatDate(project.startDate));
     html += infoRow("Target Date", Data.formatDate(project.targetDate));
     html += infoRow("Status", statusLabel);
@@ -923,8 +1128,8 @@ var App = (function () {
     html += "</div></div>";
 
     html += '<div class="drawer-section"><div class="drawer-section-title-row"><div class="drawer-section-title">Project Timeline</div>' +
-      (p2.edit ? '<button class="btn btn-primary btn-sm" id="btnAddActivity">+ Add Activity</button>' : "") + "</div>";
-    html += Timeline.renderProjectTimeline(project);
+      ((canDirect || canPropose) ? '<button class="btn btn-primary btn-sm" id="btnAddActivity">' + (canDirect ? "+ Add Activity" : "+ Propose Activity") + '</button>' : "") + "</div>";
+    html += Timeline.renderProjectTimeline(project, canDirect, canPropose);
     html += "</div>";
 
     html += '<div class="drawer-section"><div class="drawer-section-title">Activity Log</div><div class="audit-log">';
@@ -936,15 +1141,15 @@ var App = (function () {
     html += "</div></div></div>";
 
     openDrawer(html);
-    attachDrawerEvents(project, p2);
+    attachDrawerEvents(project, p2, canDirect, canPropose);
   }
 
   function infoRow(label, value) { return '<div class="info-row"><span class="info-label">' + esc(label) + '</span><span class="info-value">' + esc(value || "—") + "</span></div>"; }
   function miniStat(label, value) { return '<div class="mini-stat"><div class="mini-stat-value">' + value + '</div><div class="mini-stat-label">' + esc(label) + "</div></div>"; }
 
-  function attachDrawerEvents(project, p2) {
+  function attachDrawerEvents(project, p2, canDirect, canPropose) {
     $("#drawerCloseBtn").addEventListener("click", closeDrawer);
-    if (p2.edit) {
+    if (canDirect || canPropose) {
       $("#btnEditProject").addEventListener("click", function () { openProjectForm(project.id); });
       $("#btnDeleteProject").addEventListener("click", function () { confirmDeleteProject(project.id, true); });
       var addActBtn = $("#btnAddActivity");
@@ -971,79 +1176,138 @@ var App = (function () {
   }
 
   function openProjectForm(projectId) {
-    if (!perms().edit) return alert("You have view-only access and can't add or edit projects.");
     var project = projectId ? findProject(projectId) : null;
     var isEdit = !!project;
+    var s = Auth.isEnabled() ? Auth.state() : null;
+
+    if (isEdit) {
+      if (!canEditProject(project) && !isProposing()) return alert("You don't have edit access to this project.");
+    } else {
+      if (!perms().canAddProjects) return alert("You don't have permission to add projects.");
+    }
+
+    var proposing = isProposing(); // intern: this submission becomes a pending change, not a live write
     project = project || {
       client: "", projectName: "", projectType: "POC", environment: "SaaS", cloudProvider: "AWS",
-      infrastructureOwnership: "IDfy", owner: "", startDate: Data.todayStr(), targetDate: "",
+      infrastructureOwnership: "IDfy", owner: "", ownerEmail: "", startDate: Data.todayStr(), targetDate: "",
       status: "backlog", health: "ON TRACK", modules: [], description: ""
     };
 
-    var html = '<div class="modal-header"><h2>' + (isEdit ? "Edit Project" : "Add Project") + '</h2><button class="drawer-close" id="modalCloseBtn">&times;</button></div>';
-    html += '<form id="projectForm" class="form-grid">';
-    html += formField("Client Name", '<input type="text" id="f_client" value="' + esc(project.client) + '" required>');
-    html += formField("Project Name", '<input type="text" id="f_projectName" value="' + esc(project.projectName) + '" required>');
-    html += formField("Project Type", selectHtml("f_projectType", Data.PROJECT_TYPES, project.projectType, true));
-    html += formField("Environment Type", selectHtml("f_environment", Data.ENV_TYPES, project.environment, true));
-    html += formField("Cloud Provider", selectHtml("f_cloudProvider", Data.CLOUD_PROVIDERS, project.cloudProvider || "AWS"), "f_cloudProviderRow");
-    html += formField("Infrastructure Ownership", selectHtml("f_infra", Data.INFRA_OWNERSHIP, project.infrastructureOwnership, true));
-    html += formField("Project Owner", '<input type="text" id="f_owner" value="' + esc(project.owner) + '" required>');
-    html += formField("Start Date", '<input type="date" id="f_startDate" value="' + esc(project.startDate) + '" required>');
-    html += formField("Target Date", '<input type="date" id="f_targetDate" value="' + esc(project.targetDate) + '">');
-    html += formField("Status", selectHtml("f_status", Data.STATUSES.map(function (s) { return s.label; }), (Data.STATUSES.filter(function (s) { return s.key === project.status; })[0] || {}).label || "Backlog", true));
-    html += formField("Health", selectHtml("f_health", Data.HEALTHS, project.health, true));
-    html += formField("Privy Modules", multiSelectHtml("modules", Data.MODULES, project.modules), null, true);
-    html += formField("Description", '<textarea id="f_description" rows="3">' + esc(project.description) + "</textarea>", null, true);
-    html += '<div class="form-actions"><button type="button" class="btn btn-ghost" id="btnCancelProject">Cancel</button><button type="submit" class="btn btn-primary">Save Project</button></div>';
-    html += "</form>";
-    openModal(html);
+    // Who can this be owned by? Admin/intern get a picker; a member creating
+    // their own project is auto-assigned to themselves (no picker shown); a
+    // member editing already only reaches here if they own it, so no
+    // reassignment UI either — only admin reassigns ownership.
+    var showOwnerPicker = Auth.isEnabled() && s && (s.isAdmin || (proposing && !isEdit));
 
-    function toggleCloudRow() { var row = $("#f_cloudProviderRow"); if (row) row.style.display = $("#f_environment").value === "Cloud" ? "" : "none"; }
-    $("#f_environment").addEventListener("change", toggleCloudRow);
-    toggleCloudRow();
-    $("#modalCloseBtn").addEventListener("click", closeModal);
-    $("#btnCancelProject").addEventListener("click", closeModal);
+    function renderForm(ownerCandidates) {
+      var html = '<div class="modal-header"><h2>' + (proposing ? (isEdit ? "Propose Edit — Project" : "Propose New Project") : (isEdit ? "Edit Project" : "Add Project")) + '</h2><button class="drawer-close" id="modalCloseBtn">&times;</button></div>';
+      html += '<form id="projectForm" class="form-grid">';
+      html += formField("Client Name", '<input type="text" id="f_client" value="' + esc(project.client) + '" required>');
+      html += formField("Project Name", '<input type="text" id="f_projectName" value="' + esc(project.projectName) + '" required>');
+      html += formField("Project Type", selectHtml("f_projectType", Data.PROJECT_TYPES, project.projectType, true));
+      html += formField("Environment Type", selectHtml("f_environment", Data.ENV_TYPES, project.environment, true));
+      html += formField("Cloud Provider", selectHtml("f_cloudProvider", Data.CLOUD_PROVIDERS, project.cloudProvider || "AWS"), "f_cloudProviderRow");
+      html += formField("Infrastructure Ownership", selectHtml("f_infra", Data.INFRA_OWNERSHIP, project.infrastructureOwnership, true));
 
-    $("#projectForm").addEventListener("submit", function (e) {
-      e.preventDefault();
-      var modules = $all('.multi-select[data-name="modules"] input:checked').map(function (i) { return i.value; });
-      var statusLabel = $("#f_status").value;
-      var statusKey = (Data.STATUSES.filter(function (s) { return s.label === statusLabel; })[0] || {}).key || "backlog";
-
-      var payload = {
-        client: $("#f_client").value.trim(), projectName: $("#f_projectName").value.trim(),
-        projectType: $("#f_projectType").value, environment: $("#f_environment").value,
-        cloudProvider: $("#f_environment").value === "Cloud" ? $("#f_cloudProvider").value : "",
-        infrastructureOwnership: $("#f_infra").value, owner: $("#f_owner").value.trim(),
-        startDate: $("#f_startDate").value, targetDate: $("#f_targetDate").value,
-        status: statusKey, health: $("#f_health").value, modules: modules,
-        description: $("#f_description").value.trim()
-      };
-
-      if (isEdit) {
-        var oldStatus = project.status, oldHealth = project.health;
-        Object.assign(project, payload);
-        if (oldStatus !== project.status) {
-          var oldLabel = (Data.STATUSES.filter(function (s) { return s.key === oldStatus; })[0] || {}).label || oldStatus;
-          addAudit(project, "Status changed: " + oldLabel + " → " + statusLabel);
-        }
-        if (oldHealth !== project.health) addAudit(project, "Health changed: " + oldHealth + " → " + project.health);
-        persistProject(project);
+      if (showOwnerPicker) {
+        var options = ownerCandidates.map(function (u) { return '<option value="' + esc(u.email) + '" data-name="' + esc(u.displayName) + '"' + (u.email === project.ownerEmail ? " selected" : "") + ">" + esc(u.displayName) + " (" + esc(u.email) + ")</option>"; }).join("");
+        html += formField(proposing ? "Assign to (who will review/own this)" : "Project Owner", '<select id="f_ownerEmail" required><option value="">— Select —</option>' + options + "</select>");
+      } else if (isEdit) {
+        html += formField("Project Owner", '<input type="text" value="' + esc(ownerDisplay(project)) + '" disabled>');
       } else {
-        payload.id = Data.generateId("proj");
-        payload.activities = [];
-        payload.auditLog = [{ date: Data.todayStr(), text: "Project created" }];
-        state.projects.push(payload);
-        project = payload;
-        persistProject(project);
+        html += formField("Project Owner", '<input type="text" value="' + esc(s ? s.profile.displayName : "You") + '" disabled>');
       }
 
-      closeModal();
-      if (["dashboard", "kanban", "projects"].indexOf(state.page) !== -1) renderPage();
-      if ($("#drawerBackdrop").classList.contains("open") && state.selectedProjectId === project.id) renderDrawer();
-      if (!isEdit) navigate("kanban");
-    });
+      html += formField("Start Date", '<input type="date" id="f_startDate" value="' + esc(project.startDate) + '" required>');
+      html += formField("Target Date", '<input type="date" id="f_targetDate" value="' + esc(project.targetDate) + '">');
+      html += formField("Status", selectHtml("f_status", Data.STATUSES.map(function (s2) { return s2.label; }), (Data.STATUSES.filter(function (s2) { return s2.key === project.status; })[0] || {}).label || "Backlog", true));
+      html += formField("Health", selectHtml("f_health", Data.HEALTHS, project.health, true));
+      html += formField("Privy Modules", multiSelectHtml("modules", Data.MODULES, project.modules), null, true);
+      html += formField("Description", '<textarea id="f_description" rows="3">' + esc(project.description) + "</textarea>", null, true);
+      if (proposing) html += '<div class="form-field form-field-full"><div class="empty-state">This will be submitted for approval — nothing changes live until an admin or the project owner approves it.</div></div>';
+      html += '<div class="form-actions"><button type="button" class="btn btn-ghost" id="btnCancelProject">Cancel</button><button type="submit" class="btn btn-primary">' + (proposing ? "Submit for Approval" : "Save Project") + "</button></div>";
+      html += "</form>";
+      openModal(html);
+
+      function toggleCloudRow() { var row = $("#f_cloudProviderRow"); if (row) row.style.display = $("#f_environment").value === "Cloud" ? "" : "none"; }
+      $("#f_environment").addEventListener("change", toggleCloudRow);
+      toggleCloudRow();
+      $("#modalCloseBtn").addEventListener("click", closeModal);
+      $("#btnCancelProject").addEventListener("click", closeModal);
+
+      $("#projectForm").addEventListener("submit", function (e) {
+        e.preventDefault();
+        var modules = $all('.multi-select[data-name="modules"] input:checked').map(function (i) { return i.value; });
+        var statusLabel = $("#f_status").value;
+        var statusKey = (Data.STATUSES.filter(function (s2) { return s2.label === statusLabel; })[0] || {}).key || "backlog";
+
+        var ownerEmail, ownerName;
+        if (showOwnerPicker) {
+          var sel = $("#f_ownerEmail");
+          var opt = sel.options[sel.selectedIndex];
+          if (!sel.value) { alert("Please assign an owner."); return; }
+          ownerEmail = sel.value;
+          ownerName = opt ? opt.getAttribute("data-name") : sel.value;
+        } else if (isEdit) {
+          ownerEmail = project.ownerEmail; ownerName = project.owner;
+        } else {
+          ownerEmail = s ? s.email : ""; ownerName = s ? s.profile.displayName : "";
+        }
+
+        var payload = {
+          client: $("#f_client").value.trim(), projectName: $("#f_projectName").value.trim(),
+          projectType: $("#f_projectType").value, environment: $("#f_environment").value,
+          cloudProvider: $("#f_environment").value === "Cloud" ? $("#f_cloudProvider").value : "",
+          infrastructureOwnership: $("#f_infra").value, owner: ownerName, ownerEmail: ownerEmail,
+          startDate: $("#f_startDate").value, targetDate: $("#f_targetDate").value,
+          status: statusKey, health: $("#f_health").value, modules: modules,
+          description: $("#f_description").value.trim()
+        };
+
+        if (proposing) {
+          Auth.submitPendingChange({
+            type: isEdit ? "edit_project" : "create_project",
+            targetProjectId: isEdit ? project.id : null,
+            targetOwnerEmail: ownerEmail,
+            clientLabel: payload.client + " — " + payload.projectName,
+            payload: payload
+          }).then(function () {
+            closeModal();
+            alert("Submitted for approval. " + ownerName + " (or an admin) will review it in Approvals.");
+          }).catch(function (err) { alert("Couldn't submit: " + err.message); });
+          return;
+        }
+
+        if (isEdit) {
+          var oldStatus = project.status, oldHealth = project.health;
+          Object.assign(project, payload);
+          if (oldStatus !== project.status) {
+            var oldLabel = (Data.STATUSES.filter(function (s2) { return s2.key === oldStatus; })[0] || {}).label || oldStatus;
+            addAudit(project, "Status changed: " + oldLabel + " → " + statusLabel);
+          }
+          if (oldHealth !== project.health) addAudit(project, "Health changed: " + oldHealth + " → " + project.health);
+          persistProject(project);
+        } else {
+          payload.id = Data.generateId("proj");
+          payload.activities = [];
+          payload.auditLog = [{ date: Data.todayStr(), text: "Project created" }];
+          state.projects.push(payload);
+          project = payload;
+          persistProject(project);
+        }
+
+        closeModal();
+        if (["dashboard", "kanban", "projects"].indexOf(state.page) !== -1) renderPage();
+        if ($("#drawerBackdrop").classList.contains("open") && state.selectedProjectId === project.id) renderDrawer();
+        if (!isEdit) navigate("kanban");
+      });
+    }
+
+    if (showOwnerPicker) {
+      Auth.listOwnerCandidates(renderForm);
+    } else {
+      renderForm([]);
+    }
   }
 
   function formField(label, inputHtml, rowId, fullWidth) {
@@ -1051,9 +1315,26 @@ var App = (function () {
   }
 
   function confirmDeleteProject(id, andCloseDrawer) {
-    if (!perms().edit) return alert("You have view-only access and can't delete projects.");
     var project = findProject(id);
     if (!project) return;
+    var proposing = isProposing();
+    if (!canEditProject(project) && !proposing) return alert("You don't have edit access to this project.");
+
+    if (proposing) {
+      if (!confirm('Propose deleting "' + project.client + " — " + project.projectName + '"? This will be sent for approval.')) return;
+      Auth.submitPendingChange({
+        type: "delete_project",
+        targetProjectId: project.id,
+        targetOwnerEmail: project.ownerEmail || null,
+        clientLabel: project.client + " — " + project.projectName,
+        payload: {}
+      }).then(function () {
+        if (andCloseDrawer) closeDrawer();
+        alert("Deletion proposed — awaiting approval.");
+      });
+      return;
+    }
+
     if (!confirm('Delete "' + project.client + " — " + project.projectName + '"? This will also delete its activity history. This cannot be undone.')) return;
     state.projects = state.projects.filter(function (p) { return p.id !== id; });
     persistDelete(id);
@@ -1063,9 +1344,11 @@ var App = (function () {
 
   // ---------------------------------------------------------------- activity form (add/edit)
   function openActivityForm(projectId, activityId) {
-    if (!perms().edit) return alert("You have view-only access and can't add or edit activities.");
     var project = findProject(projectId);
     if (!project) return;
+    var proposing = isProposing();
+    if (!canEditProject(project) && !proposing) return alert("You don't have edit access to this project.");
+
     var activity = activityId ? (project.activities || []).filter(function (a) { return a.id === activityId; })[0] : null;
     var isEdit = !!activity;
     activity = activity || {
@@ -1074,7 +1357,7 @@ var App = (function () {
       status: "OPEN", impact: "", relatedPhase: "", notes: ""
     };
 
-    var html = '<div class="modal-header"><h2>' + (isEdit ? "Edit Activity" : "Add Activity") + '</h2><button class="drawer-close" id="modalCloseBtn">&times;</button></div>';
+    var html = '<div class="modal-header"><h2>' + (proposing ? (isEdit ? "Propose Edit — Activity" : "Propose Activity") : (isEdit ? "Edit Activity" : "Add Activity")) + '</h2><button class="drawer-close" id="modalCloseBtn">&times;</button></div>';
     html += '<form id="activityForm" class="form-grid">';
     html += formField("Activity Date", '<input type="date" id="a_date" value="' + esc(activity.date) + '" required>');
     html += formField("Activity Type", selectHtml("a_type", Data.ACTIVITY_TYPES, activity.activityType, true));
@@ -1090,7 +1373,8 @@ var App = (function () {
     html += formField("Impact", '<input type="text" id="a_impact" value="' + esc(activity.impact) + '">', null, true);
     html += formField("Related Phase", '<input type="text" id="a_phase" value="' + esc(activity.relatedPhase) + '">');
     html += formField("Notes", '<textarea id="a_notes" rows="2">' + esc(activity.notes) + "</textarea>", null, true);
-    html += '<div class="form-actions"><button type="button" class="btn btn-ghost" id="btnCancelActivity">Cancel</button><button type="submit" class="btn btn-primary">Save Activity</button></div>';
+    if (proposing) html += '<div class="form-field form-field-full"><div class="empty-state">This will be submitted for approval — nothing changes live until an admin or the project owner approves it.</div></div>';
+    html += '<div class="form-actions"><button type="button" class="btn btn-ghost" id="btnCancelActivity">Cancel</button><button type="submit" class="btn btn-primary">' + (proposing ? "Submit for Approval" : "Save Activity") + "</button></div>";
     html += "</form>";
     openModal(html);
     $("#modalCloseBtn").addEventListener("click", closeModal);
@@ -1106,6 +1390,22 @@ var App = (function () {
         status: $("#a_status").value, impact: $("#a_impact").value.trim(),
         relatedPhase: $("#a_phase").value.trim(), notes: $("#a_notes").value.trim()
       };
+
+      if (proposing) {
+        if (isEdit) payload.activityId = activity.id;
+        Auth.submitPendingChange({
+          type: isEdit ? "edit_activity" : "add_activity",
+          targetProjectId: project.id,
+          targetOwnerEmail: project.ownerEmail || null,
+          clientLabel: project.client + " — " + project.projectName,
+          payload: payload
+        }).then(function () {
+          closeModal();
+          alert("Submitted for approval.");
+        }).catch(function (err) { alert("Couldn't submit: " + err.message); });
+        return;
+      }
+
       project.activities = project.activities || [];
       if (isEdit) { Object.assign(activity, payload); addAudit(project, "Activity updated: " + payload.description); }
       else { payload.id = Data.generateId("act"); project.activities.push(payload); addAudit(project, "Activity added: " + payload.description); }
@@ -1117,11 +1417,25 @@ var App = (function () {
   }
 
   function confirmDeleteActivity(projectId, activityId) {
-    if (!perms().edit) return alert("You have view-only access and can't delete activities.");
     var project = findProject(projectId);
     if (!project) return;
+    var proposing = isProposing();
+    if (!canEditProject(project) && !proposing) return alert("You don't have edit access to this project.");
     var activity = (project.activities || []).filter(function (a) { return a.id === activityId; })[0];
     if (!activity) return;
+
+    if (proposing) {
+      if (!confirm('Propose deleting activity "' + activity.description + '"? This will be sent for approval.')) return;
+      Auth.submitPendingChange({
+        type: "delete_activity",
+        targetProjectId: project.id,
+        targetOwnerEmail: project.ownerEmail || null,
+        clientLabel: project.client + " — " + project.projectName,
+        payload: { activityId: activityId, description: activity.description }
+      }).then(function () { alert("Deletion proposed — awaiting approval."); });
+      return;
+    }
+
     if (!confirm('Delete activity "' + activity.description + '"? This cannot be undone.')) return;
     project.activities = project.activities.filter(function (a) { return a.id !== activityId; });
     addAudit(project, "Activity deleted: " + activity.description);

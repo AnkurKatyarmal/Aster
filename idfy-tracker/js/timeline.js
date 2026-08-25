@@ -21,13 +21,16 @@ var Timeline = (function () {
   }
 
   // -------- project-level vertical timeline --------
-  function renderProjectTimeline(project) {
+  function renderProjectTimeline(project, canDirect, canPropose) {
+    var showActions = canDirect || canPropose;
+    var editLabel = canDirect ? "Edit" : "Propose edit";
+    var deleteLabel = canDirect ? "Delete" : "Propose delete";
     var activities = (project.activities || []).slice().sort(function (a, b) {
       return (a.date || "").localeCompare(b.date || "");
     });
 
     if (!activities.length) {
-      return '<div class="empty-state">No activities logged yet. Use "Add Activity" to start building the history.</div>';
+      return '<div class="empty-state">No activities logged yet. Use "' + (canDirect ? "Add Activity" : "Propose Activity") + '" to start building the history.</div>';
     }
 
     // group by date
@@ -69,10 +72,12 @@ var Timeline = (function () {
 
         html += '<div class="vtimeline-footer">' + statusPill(a.status);
         if (a.relatedPhase) html += '<span class="phase-tag">' + App.esc(a.relatedPhase) + "</span>";
-        html += '<span class="vtimeline-actions">' +
-          '<button class="link-btn" data-edit-activity="' + a.id + '">Edit</button>' +
-          '<button class="link-btn link-danger" data-delete-activity="' + a.id + '">Delete</button>' +
-          "</span>";
+        if (showActions) {
+          html += '<span class="vtimeline-actions">' +
+            '<button class="link-btn" data-edit-activity="' + a.id + '">' + editLabel + "</button>" +
+            '<button class="link-btn link-danger" data-delete-activity="' + a.id + '">' + deleteLabel + "</button>" +
+            "</span>";
+        }
         html += "</div>";
         if (a.notes) html += '<div class="vtimeline-notes">' + App.esc(a.notes) + "</div>";
         html += "</div></div>";

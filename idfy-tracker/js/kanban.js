@@ -36,8 +36,7 @@ var Kanban = (function () {
     return html || '<span class="chip chip-empty">—</span>';
   }
 
-  function renderCard(project, perms) {
-    perms = perms || { edit: true };
+  function renderCard(project, canEdit) {
     var analytics = Data.calcProjectAnalytics(project);
     var dep = Data.currentDependency(project);
     var progress = Data.progressFor(project);
@@ -60,7 +59,7 @@ var Kanban = (function () {
     }
 
     return (
-      '<div class="kanban-card" draggable="' + (perms.edit ? "true" : "false") + '" data-id="' + project.id + '">' +
+      '<div class="kanban-card" draggable="' + (canEdit ? "true" : "false") + '" data-id="' + project.id + '">' +
         '<div class="card-top">' +
           '<div class="card-client">' + App.esc(project.client) + "</div>" +
           '<span class="health-dot ' + healthDotClass(project.health) + '" title="Health: ' + App.esc(project.health) + '"></span>' +
@@ -81,14 +80,19 @@ var Kanban = (function () {
     );
   }
 
-  function render(container, projects, perms) {
-    perms = perms || { edit: true };
+  // canEditFn: function(project) -> boolean, called per card to decide
+  // drag-ability. Defaults to "everyone can edit" if not supplied.
+  function render(container, projects, canEditFn) {
+    canEditFn = canEditFn || function () { return true; };
     var byStatus = {};
     Data.STATUSES.forEach(function (s) { byStatus[s.key] = []; });
     projects.forEach(function (p) {
       if (!byStatus[p.status]) byStatus[p.status] = [];
       byStatus[p.status].push(p);
     });
+
+    var anyEditable = projects.some(canEditFn);
+    var allEditable = projects.every(canEditFn);
 
     var html = '<div class="kanban-board">';
     Data.STATUSES.forEach(function (s) {
@@ -99,15 +103,20 @@ var Kanban = (function () {
       if (!items.length) {
         html += '<div class="kanban-empty">No projects</div>';
       } else {
-        items.forEach(function (p) { html += renderCard(p, perms); });
+        items.forEach(function (p) { html += renderCard(p, canEditFn(p)); });
       }
       html += "</div></div>";
     });
     html += "</div>";
-    if (!perms.edit) html = '<div class="viewonly-banner">View-only access — drag-and-drop is disabled.</div>' + html;
+    if (!allEditable && projects.length) {
+      var bannerText = anyEditable
+        ? "Drag-and-drop only works on projects you own — others show as read-only. Use Edit Project to propose a change on the rest."
+        : "Drag-and-drop is only available for projects you own (or use Edit Project to propose a change).";
+      html = '<div class="viewonly-banner">' + bannerText + '</div>' + html;
+    }
     container.innerHTML = html;
 
-    if (perms.edit) attachDnD(container);
+    attachDnD(container, canEditFn);
     attachClicks(container);
   }
 
@@ -121,8 +130,8 @@ var Kanban = (function () {
 
   var draggedId = null;
 
-  function attachDnD(container) {
-    container.querySelectorAll(".kanban-card").forEach(function (card) {
+  function attachDnD(container, canEditFn) {
+    container.querySelectorAll('.kanban-card[draggable="true"]').forEach(function (card) {
       card.addEventListener("dragstart", function (e) {
         draggedId = card.getAttribute("data-id");
         card.classList.add("dragging");
