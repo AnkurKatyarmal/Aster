@@ -23,7 +23,7 @@ service cloud.firestore {
     // profile MUST be either "pending" or this exact bootstrap-admin shape,
     // never anything a client could use to self-approve.
     function isBootstrapAdminEmail() {
-      return request.auth.token.email in ['you@example.com'];
+      return request.auth.token.email in ['ankur.katyarmal@gmail.com'];
     }
 
     match /users/{uid} {

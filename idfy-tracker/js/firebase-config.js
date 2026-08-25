@@ -11,12 +11,12 @@
    ========================================================================== */
 
 var FIREBASE_CONFIG = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-  projectId: "YOUR_PROJECT_ID",
-  storageBucket: "YOUR_PROJECT_ID.appspot.com",
-  messagingSenderId: "YOUR_SENDER_ID",
-  appId: "YOUR_APP_ID"
+  apiKey: "AIzaSyBIzmOCCLZ07NxhwpvtZLIRdseasfL63oY",
+  authDomain: "github-storage-a9b4d.firebaseapp.com",
+  projectId: "github-storage-a9b4d",
+  storageBucket: "github-storage-a9b4d.firebasestorage.app",
+  messagingSenderId: "813999434899",
+  appId: "1:813999434899:web:b026a0a44ac04d0c047166"
 };
 
 // The very first sign-in problem: nobody can approve anyone if no admin
@@ -28,7 +28,7 @@ var FIREBASE_CONFIG = {
 // (the isBootstrapAdminEmail function) or the security rules will reject
 // the admin's own first sign-in. Keep the two in sync.
 var ADMIN_EMAILS = [
-  "you@example.com"
+  "ankur.katyarmal@gmail.com"
 ];
 
 // Detected automatically — do not edit.
