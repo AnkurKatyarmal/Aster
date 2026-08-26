@@ -84,8 +84,22 @@ service cloud.firestore {
     // through /pendingChanges and only become real writes once an admin or
     // the project's owner applies the approved change (as that same admin
     // or owning member, so this same rule still governs the actual write).
+    //
+    // READ VISIBILITY: a Member sees only projects they own UNLESS an admin
+    // has granted them full portfolio view (myProfile().canViewAll == true).
+    // Everyone else who's approved (Admin, Intern, Viewer, Viewer+Download)
+    // sees everything, same as before — this restriction is Member-only.
+    // The app's Storage.subscribe() query must match this exactly (adds a
+    // where("ownerEmail","==",email) clause for restricted Members) or
+    // Firestore will reject the unfiltered list query outright.
+    function canSeeAllProjects() {
+      return isAdmin()
+        || (isApproved() && myRole() in ['viewer', 'viewer_download', 'intern'])
+        || (isMember() && myProfile().canViewAll == true);
+    }
     match /projects/{projectId} {
-      allow read: if isApproved();
+      allow read: if canSeeAllProjects()
+        || (isMember() && resource.data.ownerEmail == request.auth.token.email);
       allow create: if isAdmin()
         || (isMember() && request.resource.data.ownerEmail == request.auth.token.email);
       allow update, delete: if isAdmin()
