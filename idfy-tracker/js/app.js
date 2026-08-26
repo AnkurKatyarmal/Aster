@@ -361,6 +361,13 @@ var App = (function () {
   var unsubApprovals = null;
 
   // ---------------------------------------------------------------- dashboard
+  function scopedViewBanner() {
+    if (!Auth.isEnabled()) return "";
+    var s = Auth.state();
+    if (s.role !== "member" || s.canViewAll) return "";
+    return '<div class="viewonly-banner">Showing only projects you own. Ask an admin to grant "Full portfolio" view from Access Requests if you need to see everything.</div>';
+  }
+
   function renderDashboard(main) {
     var projects = state.projects;
     var total = projects.length;
@@ -382,6 +389,7 @@ var App = (function () {
     }
 
     var html = '<div class="page-header"><h1>IDfy Project Tracker</h1><p class="page-subtitle">Portfolio overview and delivery health</p></div>';
+    html += scopedViewBanner();
     if (!projects.length) {
       html += '<div class="empty-state">No projects yet. ' + (perms().canAddProjects ? 'Use <strong>+ Add Project</strong>, or go to Settings to import data or load sample data.' : 'Ask an admin to add projects or grant you access.') + '</div>';
       main.innerHTML = html;
@@ -439,6 +447,7 @@ var App = (function () {
 
   function renderKanbanPage(main) {
     var html = '<div class="page-header"><h1>Kanban</h1><p class="page-subtitle">Current state of every project — drag cards to update status</p></div>';
+    html += scopedViewBanner();
     html += filterBarHtml();
     html += '<div id="kanbanContainer"></div>';
     main.innerHTML = html;
@@ -1012,19 +1021,27 @@ var App = (function () {
 
     Auth.listAllUsers(function (rows) {
       var el = $("#allUsersSection");
-      var h = '<div class="table-wrap"><table class="data-table"><thead><tr><th>Name</th><th>Email</th><th>Status</th><th>Role</th><th></th></tr></thead><tbody>';
+      var h = '<div class="table-wrap"><table class="data-table"><thead><tr><th>Name</th><th>Email</th><th>Status</th><th>Role</th><th>View</th><th></th></tr></thead><tbody>';
       rows.forEach(function (u) {
         h += "<tr><td>" + esc(u.displayName) + "</td><td>" + esc(u.email) + "</td><td>" + esc(u.status) + "</td>";
         h += "<td>" + (u.role === "admin" ? "Admin" :
           '<select data-change-role="' + u.uid + '">' +
           Auth.ROLES.filter(function (r) { return r !== "admin"; }).map(function (r) { return '<option value="' + r + '"' + (r === u.role ? " selected" : "") + '>' + Auth.ROLE_LABELS[r] + "</option>"; }).join("") +
           "</select>") + "</td>";
+        if (u.role === "member" && u.status === "approved") {
+          h += '<td><label class="ms-option" style="text-transform:none;font-size:12px;"><input type="checkbox" data-full-view="' + u.uid + '"' + (u.canViewAll ? " checked" : "") + '> Full portfolio</label></td>';
+        } else {
+          h += "<td><span style=\"color:var(--ink-soft);font-size:11.5px;\">" + (u.role === "member" ? "Own projects only" : "All projects") + "</span></td>";
+        }
         h += "<td>" + (u.status === "approved" && u.role !== "admin" ? '<button class="link-btn link-danger" data-revoke="' + u.uid + '">Revoke</button>' : "") + "</td></tr>";
       });
       h += "</tbody></table></div>";
       el.innerHTML = h;
       $all("[data-change-role]", el).forEach(function (sel) {
-        sel.addEventListener("change", function () { Auth.changeRole(sel.getAttribute("data-change-role"), sel.value); });
+        sel.addEventListener("change", function () { Auth.changeRole(sel.getAttribute("data-change-role"), sel.value).then(function () { renderAccessPage(main); }); });
+      });
+      $all("[data-full-view]", el).forEach(function (chk) {
+        chk.addEventListener("change", function () { Auth.grantFullView(chk.getAttribute("data-full-view"), chk.checked); });
       });
       $all("[data-revoke]", el).forEach(function (btn) {
         btn.addEventListener("click", function () {

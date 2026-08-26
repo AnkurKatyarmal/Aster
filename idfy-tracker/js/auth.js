@@ -149,7 +149,11 @@ var Auth = (function () {
       // pending proposal — see App.perms() / project CRUD handlers).
       canAddProjects: approved && (role === "admin" || role === "member" || role === "intern"),
       canDownload: approved && (role === "admin" || role === "member" || role === "viewer_download"),
-      canApprove: approved && (role === "admin" || role === "member")
+      canApprove: approved && (role === "admin" || role === "member"),
+      // A Member sees only their own projects by default; an admin can
+      // grant a specific Member full portfolio visibility (view only —
+      // this never changes what they're allowed to EDIT, still own-projects-only).
+      canViewAll: approved && (role !== "member" || !!(currentProfile && currentProfile.canViewAll))
     };
   }
 
@@ -210,6 +214,13 @@ var Auth = (function () {
 
   function revokeUser(uid) {
     return db.collection("users").doc(uid).update({ status: "pending" });
+  }
+
+  // Grants (or revokes) a Member full portfolio visibility, instead of the
+  // default own-projects-only view. Purely a READ scope change — never
+  // affects what they're allowed to edit (still own-projects-only).
+  function grantFullView(uid, canViewAll) {
+    return db.collection("users").doc(uid).update({ canViewAll: !!canViewAll });
   }
 
   // ---- maker-checker: pending CONTENT changes (Intern submissions) ----
@@ -302,6 +313,7 @@ var Auth = (function () {
     rejectUser: rejectUser,
     changeRole: changeRole,
     revokeUser: revokeUser,
+    grantFullView: grantFullView,
     submitPendingChange: submitPendingChange,
     listPendingChangesFor: listPendingChangesFor,
     markChangeReviewed: markChangeReviewed,

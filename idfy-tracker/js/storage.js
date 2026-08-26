@@ -30,7 +30,12 @@ var Storage = (function () {
   // ---- cloud (Firestore) ----
   // Each project is one document in the "projects" collection, doc id = project.id
   function cloudLoadOnce(callback) {
-    Auth.getDb().collection("projects").get().then(function (snap) {
+    var s = Auth.state();
+    var col = Auth.getDb().collection("projects");
+    var query = (s.role === "member" && !s.canViewAll)
+      ? col.where("ownerEmail", "==", s.email)
+      : col;
+    query.get().then(function (snap) {
       var rows = [];
       snap.forEach(function (doc) { rows.push(doc.data()); });
       callback(rows);
@@ -38,11 +43,20 @@ var Storage = (function () {
   }
 
   // Live subscription — every approved user sees changes from every other
-  // approved user immediately, no refresh needed.
+  // approved user immediately, no refresh needed. EXCEPT: a Member without
+  // "view all" access only gets their own projects — this is enforced by
+  // the query itself (matching firestore.rules exactly), not just hidden
+  // client-side, since an unfiltered query for a Member would otherwise
+  // fail Firestore's list-rule check outright.
   function subscribe(onChange) {
     if (isCloud()) {
       if (unsubProjects) unsubProjects();
-      unsubProjects = Auth.getDb().collection("projects").onSnapshot(function (snap) {
+      var s = Auth.state();
+      var col = Auth.getDb().collection("projects");
+      var query = (s.role === "member" && !s.canViewAll)
+        ? col.where("ownerEmail", "==", s.email)
+        : col;
+      unsubProjects = query.onSnapshot(function (snap) {
         var rows = [];
         snap.forEach(function (doc) { rows.push(doc.data()); });
         onChange(rows);
