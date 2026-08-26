@@ -187,6 +187,31 @@ var Data = (function () {
     return Math.round((TODAY.getTime() - d.getTime()) / 86400000);
   }
 
+  // Counts weekdays (Mon-Fri) strictly between two dates — used for waiting
+  // time specifically, since a client or internal team isn't "waiting" over
+  // a weekend in any actionable sense. Total Elapsed stays calendar-based
+  // elsewhere (a project genuinely spans that many real days).
+  function businessDaysBetween(a, b) {
+    var da = parseDate(a);
+    var db = parseDate(b);
+    if (!da || !db) return 0;
+    var start = da, end = db, sign = 1;
+    if (start.getTime() > end.getTime()) { var t = start; start = end; end = t; sign = -1; }
+    var count = 0;
+    var cur = new Date(start.getTime());
+    cur.setDate(cur.getDate() + 1);
+    while (cur.getTime() <= end.getTime()) {
+      var dow = cur.getDay(); // 0 = Sunday, 6 = Saturday
+      if (dow !== 0 && dow !== 6) count++;
+      cur.setDate(cur.getDate() + 1);
+    }
+    return sign * count;
+  }
+
+  function businessDaysFromToday(str) {
+    return businessDaysBetween(str, todayStr());
+  }
+
   // -- waiting calculation for a single activity --------------------------
   // Returns { isWaiting, days, resolved }
   function calcWaiting(activity) {
@@ -195,7 +220,7 @@ var Data = (function () {
     if (!reqD) return { isWaiting: false, days: 0, resolved: false };
 
     if (activity.receivedDate) {
-      var days = daysBetween(activity.requestedDate, activity.receivedDate);
+      var days = businessDaysBetween(activity.requestedDate, activity.receivedDate);
       return { isWaiting: false, days: Math.max(days, 0), resolved: true };
     }
 
@@ -205,7 +230,7 @@ var Data = (function () {
     }
     var openStatuses = ["OPEN", "WAITING", "PARTIALLY RECEIVED", "BLOCKED"];
     var stillOpen = openStatuses.indexOf(activity.status) !== -1;
-    var days2 = daysFromToday(activity.requestedDate);
+    var days2 = businessDaysFromToday(activity.requestedDate);
     return { isWaiting: stillOpen, days: Math.max(days2, 0), resolved: !stillOpen };
   }
 
@@ -545,6 +570,8 @@ var Data = (function () {
     formatDate: formatDate,
     todayStr: todayStr,
     daysBetween: daysBetween,
+    businessDaysBetween: businessDaysBetween,
+    businessDaysFromToday: businessDaysFromToday,
     daysFromToday: daysFromToday,
     calcWaiting: calcWaiting,
     calcProjectAnalytics: calcProjectAnalytics,
