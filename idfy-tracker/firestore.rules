@@ -119,5 +119,13 @@ service cloud.firestore {
       allow read: if true;
       allow write: if isAdmin();
     }
+
+    // Shared config docs (e.g. the Owner/Requested-By team directory used
+    // to populate dropdowns). Any approved user reads it; only an admin
+    // maintains the roster.
+    match /config/{docId} {
+      allow read: if isApproved();
+      allow write: if isAdmin();
+    }
   }
 }

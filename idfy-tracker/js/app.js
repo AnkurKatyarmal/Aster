@@ -13,8 +13,15 @@ var App = (function () {
     selectedProjectId: null,
     filters: { type: "All", environment: "All", status: "All", health: "All", module: "All", dependencyOwner: "All" },
     search: "",
-    globalTimelineFilters: {}
+    globalTimelineFilters: {},
+    teamDirectory: Data.DEFAULT_TEAM_DIRECTORY
   };
+
+  function teamDirectoryNames() {
+    var d = state.teamDirectory || Data.DEFAULT_TEAM_DIRECTORY;
+    var all = (d.delivery || []).concat(d.salesPresales || []);
+    return all.filter(function (n, i) { return n && all.indexOf(n) === i; }).sort();
+  }
 
   // ---------------------------------------------------------------- utils
   function esc(str) {
@@ -201,6 +208,8 @@ var App = (function () {
 
     attachSidebarNavOnce();
     attachGlobalSearchOnce();
+
+    Storage.subscribeTeamDirectory(function (dir) { state.teamDirectory = dir; if (state.page === "settings") renderPage(); });
 
     Storage.subscribe(function (list) {
       if (Storage.isCloud() && list.length === 0 && !state._cloudInitDone) {
@@ -664,6 +673,7 @@ var App = (function () {
           infrastructureOwnership: "IDfy",
           owner: ownerName,
           ownerEmail: ownerEmail,
+          ownerType: "Project / PM",
           startDate: fields.startDate,
           targetDate: fields.targetDate,
           status: "planned",
@@ -1093,6 +1103,19 @@ var App = (function () {
     html += '<button class="btn btn-danger" id="btnClearAll2"' + (canBulkManage() ? "" : " disabled") + '>Clear all data</button>';
     html += "</div></div>";
 
+    if (perms().admin) {
+      var dir = state.teamDirectory || Data.DEFAULT_TEAM_DIRECTORY;
+      html += '<div class="settings-card"><h3>Team directory</h3>';
+      html += "<p>Names offered in the Owner / Requested By dropdowns when logging activities. You can still type any other name (e.g. a client contact) freely — this list is just for your own team.</p>";
+      html += '<div class="form-grid" style="padding:0;">';
+      html += '<div class="form-field"><label>Delivery Team (one per line)</label><textarea id="teamDeliveryList" rows="6">' + esc((dir.delivery || []).join("\n")) + "</textarea></div>";
+      html += '<div class="form-field"><label>Sales &amp; Pre-Sales Team (one per line)</label><textarea id="teamSalesList" rows="6">' + esc((dir.salesPresales || []).join("\n")) + "</textarea></div>";
+      html += "</div>";
+      html += '<div class="settings-actions"><button class="btn btn-primary" id="btnSaveTeamDirectory">Save team directory</button></div>';
+      html += '<div id="teamDirStatus" style="margin-top:8px;font-size:12.5px;color:var(--ink-soft);"></div>';
+      html += "</div>";
+    }
+
     if (Storage.isCloud() && perms().admin) {
       var publicUrl = window.location.href.replace(/\/[^\/]*$/, "/public-dashboard.html");
       html += '<div class="settings-card"><h3>Public dashboard link</h3>';
@@ -1111,6 +1134,23 @@ var App = (function () {
       "<dt>Health</dt><dd>An independent risk signal: On Track, At Risk, Delayed, or Blocked.</dd>" +
       "</dl></div>";
     main.innerHTML = html;
+
+    var saveTeamBtn = $("#btnSaveTeamDirectory");
+    if (saveTeamBtn) {
+      saveTeamBtn.addEventListener("click", function () {
+        var newDir = {
+          delivery: $("#teamDeliveryList").value.split("\n").map(function (s) { return s.trim(); }).filter(Boolean),
+          salesPresales: $("#teamSalesList").value.split("\n").map(function (s) { return s.trim(); }).filter(Boolean)
+        };
+        saveTeamBtn.disabled = true;
+        Storage.saveTeamDirectory(newDir).then(function () {
+          state.teamDirectory = newDir;
+          var status = $("#teamDirStatus");
+          if (status) status.textContent = "Saved " + new Date().toLocaleString() + ".";
+          if (saveTeamBtn) saveTeamBtn.disabled = false;
+        });
+      });
+    }
 
     var publishBtn = $("#btnPublishSnapshot");
     if (publishBtn) {
@@ -1196,6 +1236,7 @@ var App = (function () {
     html += infoRow("Environment", Kanban.envLabel(project));
     html += infoRow("Infrastructure Ownership", project.infrastructureOwnership);
     html += infoRow("Project Owner", ownerDisplay(project));
+    html += infoRow("Owner Type", project.ownerType || "—");
     html += infoRow("Start Date", Data.formatDate(project.startDate));
     html += infoRow("Target Date", Data.formatDate(project.targetDate));
     html += infoRow("Status", statusLabel);
@@ -1293,7 +1334,7 @@ var App = (function () {
     var proposing = isProposing(); // intern: this submission becomes a pending change, not a live write
     project = project || {
       client: "", projectName: "", projectType: "POC", environment: "SaaS", cloudProvider: "AWS",
-      infrastructureOwnership: "IDfy", owner: "", ownerEmail: "", startDate: Data.todayStr(), targetDate: "",
+      infrastructureOwnership: "IDfy", owner: "", ownerEmail: "", ownerType: "Project / PM", startDate: Data.todayStr(), targetDate: "",
       status: "backlog", health: "ON TRACK", modules: [], description: ""
     };
 
@@ -1321,6 +1362,7 @@ var App = (function () {
       } else {
         html += formField("Project Owner", '<input type="text" value="' + esc(s ? s.profile.displayName : "You") + '" disabled>');
       }
+      html += formField("Owner Type", selectHtml("f_ownerType", Data.OWNER_TYPES, Data.fuzzyMatch(project.ownerType, Data.OWNER_TYPES) || project.ownerType || "Project / PM", true));
 
       html += formField("Start Date", '<input type="date" id="f_startDate" value="' + esc(project.startDate) + '" required>');
       html += formField("Target Date", '<input type="date" id="f_targetDate" value="' + esc(project.targetDate) + '">');
@@ -1363,6 +1405,7 @@ var App = (function () {
           projectType: $("#f_projectType").value, environment: $("#f_environment").value,
           cloudProvider: $("#f_environment").value === "Cloud" ? $("#f_cloudProvider").value : "",
           infrastructureOwnership: $("#f_infra").value, owner: ownerName, ownerEmail: ownerEmail,
+          ownerType: $("#f_ownerType").value,
           startDate: $("#f_startDate").value, targetDate: $("#f_targetDate").value,
           status: statusKey, health: $("#f_health").value, modules: modules,
           description: $("#f_description").value.trim()
@@ -1466,17 +1509,20 @@ var App = (function () {
     html += formField("Activity Date", '<input type="date" id="a_date" value="' + esc(activity.date) + '" required>');
     html += formField("Activity Type", selectHtml("a_type", Data.ACTIVITY_TYPES, activity.activityType, true));
     html += formField("Description", '<input type="text" id="a_description" value="' + esc(activity.description) + '" required>', null, true);
-    html += formField("Owner Type", selectHtml("a_ownerType", Data.OWNER_TYPES, activity.ownerType, true));
-    html += formField("Owner", '<input type="text" id="a_owner" value="' + esc(activity.owner) + '" placeholder="e.g. HSBC DevOps">');
+    html += formField("Owner Type", selectHtml("a_ownerType", Data.OWNER_TYPES, Data.fuzzyMatch(activity.ownerType, Data.OWNER_TYPES) || activity.ownerType, true));
+    html += formField("Owner", '<input type="text" id="a_owner" list="teamNamesList" value="' + esc(activity.owner) + '" placeholder="Pick from team, or type a client contact">');
     html += formField("Dependency Side", selectHtml("a_side", Data.DEPENDENCY_SIDES, activity.dependencySide, true));
-    html += formField("Requested By", '<input type="text" id="a_requestedBy" value="' + esc(activity.requestedBy) + '">');
+    html += formField("Requested By", '<input type="text" id="a_requestedBy" list="teamNamesList" value="' + esc(activity.requestedBy) + '">');
     html += formField("Requested Date", '<input type="date" id="a_requestedDate" value="' + esc(activity.requestedDate) + '">');
     html += formField("Expected Date", '<input type="date" id="a_expectedDate" value="' + esc(activity.expectedDate) + '">');
     html += formField("Received Date", '<input type="date" id="a_receivedDate" value="' + esc(activity.receivedDate) + '">');
     html += formField("Status", selectHtml("a_status", Data.ACTIVITY_STATUSES, activity.status, true));
-    html += formField("Impact", '<input type="text" id="a_impact" value="' + esc(activity.impact) + '">', null, true);
-    html += formField("Related Phase", '<input type="text" id="a_phase" value="' + esc(activity.relatedPhase) + '">');
+    html += formField("Impact", '<input type="text" id="a_impact" list="impactSuggestionsList" value="' + esc(activity.impact) + '">', null, true);
+    html += formField("Related Phase", '<input type="text" id="a_phase" list="implementationPhasesList" value="' + esc(activity.relatedPhase) + '">');
     html += formField("Notes", '<textarea id="a_notes" rows="2">' + esc(activity.notes) + "</textarea>", null, true);
+    html += '<datalist id="teamNamesList">' + teamDirectoryNames().map(function (n) { return '<option value="' + esc(n) + '">'; }).join("") + "</datalist>";
+    html += '<datalist id="impactSuggestionsList">' + Data.IMPACT_SUGGESTIONS.map(function (n) { return '<option value="' + esc(n) + '">'; }).join("") + "</datalist>";
+    html += '<datalist id="implementationPhasesList">' + Data.IMPLEMENTATION_PHASES.map(function (n) { return '<option value="' + esc(n) + '">'; }).join("") + "</datalist>";
     if (proposing) html += '<div class="form-field form-field-full"><div class="empty-state">This will be submitted for approval — nothing changes live until an admin or the project owner approves it.</div></div>';
     html += '<div class="form-actions"><button type="button" class="btn btn-ghost" id="btnCancelActivity">Cancel</button><button type="submit" class="btn btn-primary">' + (proposing ? "Submit for Approval" : "Save Activity") + "</button></div>";
     html += "</form>";

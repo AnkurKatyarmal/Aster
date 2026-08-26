@@ -97,6 +97,49 @@ var Storage = (function () {
     catch (e) { return false; }
   }
 
+  // ---- team directory (Owner / Requested By dropdown source) ----
+  // A single small document — same local/cloud pattern as everything else.
+  var TEAM_KEY = "idfy_tracker_team_directory_v1";
+
+  function localLoadTeam() {
+    try {
+      var raw = window.localStorage.getItem(TEAM_KEY);
+      return raw ? JSON.parse(raw) : null;
+    } catch (e) { return null; }
+  }
+  function localSaveTeam(dir) {
+    try { window.localStorage.setItem(TEAM_KEY, JSON.stringify(dir)); return true; }
+    catch (e) { return false; }
+  }
+
+  function loadTeamDirectory(callback) {
+    if (isCloud()) {
+      Auth.getDb().collection("config").doc("teamDirectory").get().then(function (doc) {
+        callback(doc.exists ? doc.data() : Data.DEFAULT_TEAM_DIRECTORY);
+      }).catch(function (e) { console.error("loadTeamDirectory failed", e); callback(Data.DEFAULT_TEAM_DIRECTORY); });
+    } else {
+      callback(localLoadTeam() || Data.DEFAULT_TEAM_DIRECTORY);
+    }
+  }
+
+  function subscribeTeamDirectory(onChange) {
+    if (isCloud()) {
+      return Auth.getDb().collection("config").doc("teamDirectory").onSnapshot(function (doc) {
+        onChange(doc.exists ? doc.data() : Data.DEFAULT_TEAM_DIRECTORY);
+      }, function (err) { console.error("subscribeTeamDirectory error", err); onChange(Data.DEFAULT_TEAM_DIRECTORY); });
+    }
+    onChange(localLoadTeam() || Data.DEFAULT_TEAM_DIRECTORY);
+    return function () {};
+  }
+
+  function saveTeamDirectory(dir) {
+    if (isCloud()) {
+      return Auth.getDb().collection("config").doc("teamDirectory").set(dir)
+        .catch(function (e) { console.error("saveTeamDirectory failed", e); alert("Could not save — check your connection and try again."); });
+    }
+    return Promise.resolve(localSaveTeam(dir));
+  }
+
   // ---- export / import ----
   function exportJSON(projects) {
     var blob = new Blob([JSON.stringify(projects, null, 2)], { type: "application/json" });
@@ -210,6 +253,9 @@ var Storage = (function () {
     saveProject: saveProject,
     deleteProject: deleteProject,
     clear: clear,
+    loadTeamDirectory: loadTeamDirectory,
+    subscribeTeamDirectory: subscribeTeamDirectory,
+    saveTeamDirectory: saveTeamDirectory,
     exportJSON: exportJSON,
     downloadTemplate: downloadTemplate,
     validateImport: validateImport,
