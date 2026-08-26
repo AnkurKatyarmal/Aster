@@ -44,7 +44,19 @@
   .empty-state, .error-state { background: #fff; border: 1px solid var(--border); border-radius: 8px; padding: 40px 24px; text-align: center; color: var(--ink-soft); }
   .waiting-badge { font-family: var(--mono); font-size: 11px; font-weight: 700; color: var(--navy); background: var(--navy-100); padding: 1px 7px; border-radius: 4px; }
   .footer-note { margin-top: 24px; font-size: 11.5px; color: var(--ink-soft); text-align: center; }
-  @media (max-width: 800px) { .stat-grid { grid-template-columns: repeat(3, 1fr); } }
+  tr.proj-row { cursor: pointer; }
+  tr.proj-row:hover { background: var(--navy-50); }
+  .chevron { display: inline-block; transition: transform 0.15s; color: var(--ink-soft); margin-right: 6px; font-size: 10px; }
+  tr.proj-row.expanded .chevron { transform: rotate(90deg); }
+  tr.detail-row td { background: var(--navy-50); padding: 14px 20px; border-bottom: 1px solid var(--border); }
+  tr.detail-row { display: none; }
+  tr.detail-row.open { display: table-row; }
+  .detail-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px 20px; margin-bottom: 10px; }
+  .detail-item { font-size: 12px; }
+  .detail-label { color: var(--ink-soft); font-size: 10px; text-transform: uppercase; margin-bottom: 2px; }
+  .detail-value { color: var(--ink); font-weight: 600; }
+  .detail-desc { font-size: 12.5px; color: var(--ink-soft); margin-top: 8px; padding-top: 10px; border-top: 1px dashed var(--border); }
+  @media (max-width: 800px) { .stat-grid { grid-template-columns: repeat(3, 1fr); } .detail-grid { grid-template-columns: repeat(2, 1fr); } }
 </style>
 </head>
 <body>
@@ -54,7 +66,7 @@
     <div class="updated" id="updatedLabel"></div>
   </div>
   <h1>Portfolio Overview</h1>
-  <p class="subtitle">Read-only snapshot — status and health across all projects</p>
+  <p class="subtitle">Read-only snapshot — status and health across all projects. Click a row for more detail.</p>
   <div id="content"><div class="empty-state">Loading…</div></div>
   <div class="footer-note">This is a read-only summary. No login required, nothing here can be edited.</div>
 </div>
@@ -77,6 +89,16 @@
   function statCard(label, value, cls) {
     return '<div class="stat-card ' + (cls || "") + '"><div class="stat-value">' + value + '</div><div class="stat-label">' + esc(label) + "</div></div>";
   }
+  function fmtDate(str) {
+    if (!str) return "—";
+    var d = new Date(str + "T00:00:00");
+    if (isNaN(d.getTime())) return "—";
+    var months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+    return d.getDate() + " " + months[d.getMonth()] + " " + d.getFullYear();
+  }
+  function detailItem(label, value) {
+    return '<div class="detail-item"><div class="detail-label">' + esc(label) + '</div><div class="detail-value">' + esc(value || "—") + "</div></div>";
+  }
 
   // Exposed on window so this can be unit-tested by feeding it fixture data
   // without needing a real Firebase connection.
@@ -97,9 +119,9 @@
     html += "</div>";
 
     html += '<div class="table-wrap"><table><thead><tr><th>Client</th><th>Project</th><th>Type</th><th>Modules</th><th>Status</th><th>Health</th><th>Progress</th><th>Owner</th></tr></thead><tbody>';
-    (data.projects || []).forEach(function (p) {
-      html += "<tr>";
-      html += "<td>" + esc(p.client) + "</td>";
+    (data.projects || []).forEach(function (p, i) {
+      html += '<tr class="proj-row" data-row="' + i + '">';
+      html += "<td><span class=\"chevron\">▶</span>" + esc(p.client) + "</td>";
       html += "<td>" + esc(p.projectName) + "</td>";
       html += '<td><span class="badge ' + (p.projectType === "LIVE" ? "badge-live" : "badge-poc") + '">' + esc(p.projectType) + "</span></td>";
       html += "<td>" + (p.modules || []).map(function (m) { return '<span class="chip">' + esc(m) + "</span>"; }).join("") + "</td>";
@@ -108,10 +130,34 @@
       html += '<td><div class="progress-track"><div class="progress-fill" style="width:' + (p.progress || 0) + '%"></div></div></td>';
       html += "<td>" + esc(p.owner || "—") + "</td>";
       html += "</tr>";
+
+      html += '<tr class="detail-row" data-detail="' + i + '"><td colspan="8">';
+      html += '<div class="detail-grid">';
+      html += detailItem("Environment", p.environment);
+      html += detailItem("Owner Type", p.ownerType);
+      html += detailItem("Start Date", fmtDate(p.startDate));
+      html += detailItem("Target Date", fmtDate(p.targetDate));
+      html += detailItem("Last Activity", fmtDate(p.lastActivityDate));
+      html += detailItem("Client Waiting", (p.clientWaitingDays || 0) + " business day" + (p.clientWaitingDays === 1 ? "" : "s"));
+      html += detailItem("Internal Waiting", (p.internalWaitingDays || 0) + " business day" + (p.internalWaitingDays === 1 ? "" : "s"));
+      html += detailItem("Open Dependency", p.hasOpenDependency ? "Yes" : "No");
+      html += "</div>";
+      if (p.description) html += '<div class="detail-desc">' + esc(p.description) + "</div>";
+      html += "</td></tr>";
     });
     if (!(data.projects || []).length) html += '<tr><td colspan="8" style="text-align:center;color:var(--ink-soft);padding:24px;">No projects to show.</td></tr>';
     html += "</tbody></table></div>";
     el.innerHTML = html;
+
+    el.querySelectorAll("tr.proj-row").forEach(function (row) {
+      row.addEventListener("click", function () {
+        var i = row.getAttribute("data-row");
+        var detail = el.querySelector('tr.detail-row[data-detail="' + i + '"]');
+        var isOpen = detail.classList.contains("open");
+        detail.classList.toggle("open", !isOpen);
+        row.classList.toggle("expanded", !isOpen);
+      });
+    });
 
     if (data.generatedAt) {
       var d = data.generatedAt.toDate ? data.generatedAt.toDate() : new Date(data.generatedAt);
