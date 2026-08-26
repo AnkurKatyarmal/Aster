@@ -263,5 +263,3 @@ project's owner can write the corresponding live update.
 > Clear all data) are Admin-only in cloud mode, since they'd otherwise let
 > any Team Member overwrite the *entire shared dataset* — not just their own
 > projects.
-
-<!-- branch protection test -->
