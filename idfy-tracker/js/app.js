@@ -1044,6 +1044,7 @@ var App = (function () {
       var a = Data.calcProjectAnalytics(p);
       var dep = Data.currentDependency(p);
       var statusLabel = (Data.STATUSES.filter(function (s) { return s.key === p.status; })[0] || {}).label || p.status;
+      var lastActivity = (p.activities || []).slice().sort(function (x, y) { return (x.date || "").localeCompare(y.date || ""); }).pop();
       return {
         client: p.client,
         projectName: p.projectName,
@@ -1054,7 +1055,14 @@ var App = (function () {
         health: p.health,
         progress: Data.progressFor(p),
         owner: p.owner || "",
+        ownerType: p.ownerType || "",
+        startDate: p.startDate || "",
+        targetDate: p.targetDate || "",
+        lastActivityDate: lastActivity ? lastActivity.date : "",
+        description: p.description || "",
         totalWaitingDays: a.totalWaiting,
+        clientWaitingDays: a.clientWaiting,
+        internalWaitingDays: a.internalWaiting,
         hasOpenDependency: !!dep
       };
     });
