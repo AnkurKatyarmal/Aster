@@ -1,5 +1,5 @@
 /* ==========================================================================
-   IDfy Project Tracker — firebase-config.js
+   Ankur's Project Tracker — firebase-config.js
    Fill this in with YOUR Firebase project's config (Project Settings ->
    General -> Your apps -> SDK setup and configuration -> Config).
    See README.md "Setting up Firebase" for the full walkthrough.

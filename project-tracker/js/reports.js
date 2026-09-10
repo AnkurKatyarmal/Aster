@@ -1,5 +1,5 @@
 /* ==========================================================================
-   IDfy Project Tracker — reports.js
+   Ankur's Project Tracker — reports.js
    Builds print-ready HTML documents (project report / weekly status report)
    and opens them in a new window so the user can "Save as PDF" via the
    browser's native print dialog — no external PDF library required.

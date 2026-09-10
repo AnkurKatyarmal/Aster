@@ -1,5 +1,5 @@
 /* ==========================================================================
-   IDfy Project Tracker — timeline.js
+   Ankur's Project Tracker — timeline.js
    Project-level timeline (vertical) + global cross-project timeline table.
    ========================================================================== */
 
