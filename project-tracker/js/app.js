@@ -1,5 +1,5 @@
 /* ==========================================================================
-   IDfy Project Tracker — app.js
+   Ankur's Project Tracker — app.js
    Main application controller: auth gating, state, navigation, rendering,
    CRUD, modals, permissions, theme.
    ========================================================================== */
@@ -679,7 +679,7 @@ var App = (function () {
           projectType: "POC",
           environment: environment,
           cloudProvider: cloudProvider,
-          infrastructureOwnership: "IDfy",
+          infrastructureOwnership: "Internal",
           owner: ownerName,
           ownerEmail: ownerEmail,
           ownerType: "Project / PM",
@@ -1359,7 +1359,7 @@ var App = (function () {
     var proposing = isProposing(); // intern: this submission becomes a pending change, not a live write
     project = project || {
       client: "", projectName: "", projectType: "POC", environment: "SaaS", cloudProvider: "AWS",
-      infrastructureOwnership: "IDfy", owner: "", ownerEmail: "", ownerType: "Project / PM", startDate: Data.todayStr(), targetDate: "",
+      infrastructureOwnership: "Internal", owner: "", ownerEmail: "", ownerType: "Project / PM", startDate: Data.todayStr(), targetDate: "",
       status: "backlog", health: "ON TRACK", modules: [], description: ""
     };
 

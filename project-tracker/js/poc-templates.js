@@ -1,5 +1,5 @@
 /* ==========================================================================
-   IDfy Project Tracker — poc-templates.js
+   Ankur's Project Tracker — poc-templates.js
    Predefined, editable default content per Privy module for the "New POC"
    kickoff/scope document and the completion report. Pick a module, the form
    pre-fills with sensible defaults, edit anything before generating.

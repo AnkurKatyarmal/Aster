@@ -1,5 +1,5 @@
 /* ==========================================================================
-   IDfy Project Tracker — auth.js
+   Ankur's Project Tracker — auth.js
    Google sign-in via Firebase Auth, user status/role in Firestore, the
    admin approval queue for new sign-ins, and the maker-checker pending
    CHANGES queue (for Interns — content edits, not sign-in access).

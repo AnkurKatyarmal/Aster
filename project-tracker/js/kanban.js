@@ -1,5 +1,5 @@
 /* ==========================================================================
-   IDfy Project Tracker — kanban.js
+   Ankur's Project Tracker — kanban.js
    Kanban board rendering + drag & drop.
    ========================================================================== */
 

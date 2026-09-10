@@ -1,5 +1,5 @@
 /* ==========================================================================
-   IDfy Project Tracker — excel-import.js
+   Ankur's Project Tracker — excel-import.js
    Excel (.xlsx) is the primary data entry format: one workbook, two sheets
    (Projects, Activities), linked by Client + Project Name. Google Sheets
    round-trips fine — edit there, then File > Download > Microsoft Excel.
@@ -68,7 +68,7 @@ var ExcelIO = (function () {
       ["Allowed values — Project Type:"], ["POC, LIVE"],
       ["Allowed values — Environment:"], ["SaaS, Cloud, On-Prem"],
       ["Allowed values — Cloud Provider (only if Environment = Cloud):"], ["AWS, Azure, GCP, Other"],
-      ["Allowed values — Infrastructure Ownership:"], ["IDfy, Client, Shared"],
+      ["Allowed values — Infrastructure Ownership:"], ["Internal, Client, Shared"],
       ["Allowed values — Status:"], ["Backlog, Planned, In Progress, Blocked, UAT, Completed"],
       ["Allowed values — Health:"], ["ON TRACK, AT RISK, DELAYED, BLOCKED"],
       ["Allowed values — Modules:"], [Data.MODULES.join(", ")],
@@ -86,7 +86,7 @@ var ExcelIO = (function () {
     wsNotes["!cols"] = [{ wch: 90 }];
     window.XLSX.utils.book_append_sheet(wb, wsNotes, "Instructions");
 
-    window.XLSX.writeFile(wb, "idfy-tracker-import-template.xlsx");
+    window.XLSX.writeFile(wb, "ankurs-project-tracker-import-template.xlsx");
   }
 
   // ---------------------------------------------------------------- import
@@ -177,7 +177,7 @@ var ExcelIO = (function () {
         projectType: projectType || "POC",
         environment: environment || "SaaS",
         cloudProvider: cloudProvider,
-        infrastructureOwnership: infra || "IDfy",
+        infrastructureOwnership: infra || "Internal",
         owner: String(row["Owner"] || "").trim(),
         ownerEmail: "",
         startDate: startDate,

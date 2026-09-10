@@ -1,5 +1,5 @@
 /* ==========================================================================
-   IDfy Project Tracker — storage.js
+   Ankur's Project Tracker — storage.js
    Local mode: localStorage (default, no setup required).
    Cloud mode: Firestore, active automatically when FIREBASE_ENABLED is true.
    Same interface either way so app.js doesn't need to know which is active.
@@ -202,7 +202,7 @@ var Storage = (function () {
       }
     ];
     var blob = new Blob([JSON.stringify(template, null, 2)], { type: "application/json" });
-    downloadBlob(blob, "idfy-tracker-import-template.json");
+    downloadBlob(blob, "ankurs-project-tracker-import-template.json");
   }
 
   function downloadBlob(blob, filename) {

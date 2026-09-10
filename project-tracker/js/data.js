@@ -1,5 +1,5 @@
 /* ==========================================================================
-   IDfy Project Tracker — data.js
+   Ankur's Project Tracker — data.js
    Constants, date helpers, waiting/analytics calculations, sample data.
    ========================================================================== */
 
@@ -23,7 +23,7 @@ var Data = (function () {
 
   var ENV_TYPES = ["SaaS", "Cloud", "On-Prem"];
   var CLOUD_PROVIDERS = ["AWS", "Azure", "GCP", "Other"];
-  var INFRA_OWNERSHIP = ["IDfy", "Client", "Shared"];
+  var INFRA_OWNERSHIP = ["Internal", "Client", "Shared"];
 
   var MODULES = [
     "CGP",
@@ -306,7 +306,7 @@ var Data = (function () {
         id: generateId("act"),
         activityType: "STATUS UPDATE",
         ownerType: "Internal Tech Team",
-        owner: "IDfy",
+        owner: "Ankur Katyarmal",
         dependencySide: "Internal",
         requestedBy: "",
         requestedDate: "",
@@ -340,12 +340,12 @@ var Data = (function () {
       activities: [
         act({ date: "2026-06-15", activityType: "DELIVERABLE", description: "Docker Hub invitation accepted", ownerType: "Client", owner: "HSBC IT", dependencySide: "Client", status: "RECEIVED", relatedPhase: "Prerequisites" }),
         act({ date: "2026-06-15", activityType: "DELIVERABLE", description: "Consent form shared", ownerType: "Client", owner: "HSBC DPO", dependencySide: "Client", status: "COMPLETED", relatedPhase: "Prerequisites", notes: "Prerequisites completed" }),
-        act({ date: "2026-06-25", activityType: "DELIVERABLE", description: "UAT SaaS API credentials shared", ownerType: "Internal Tech Team", owner: "IDfy", dependencySide: "Internal", status: "COMPLETED", relatedPhase: "UAT Setup", notes: "Dependency: HSBC DevOps for validation" }),
-        act({ date: "2026-06-29", activityType: "ACTION", description: "Production image preparation started", ownerType: "Internal Tech Team", owner: "IDfy Engineering", dependencySide: "Internal", status: "COMPLETED", relatedPhase: "Build" }),
+        act({ date: "2026-06-25", activityType: "DELIVERABLE", description: "UAT SaaS API credentials shared", ownerType: "Internal Tech Team", owner: "Ankur Katyarmal", dependencySide: "Internal", status: "COMPLETED", relatedPhase: "UAT Setup", notes: "Dependency: HSBC DevOps for validation" }),
+        act({ date: "2026-06-29", activityType: "ACTION", description: "Production image preparation started", ownerType: "Internal Tech Team", owner: "Engineering Team", dependencySide: "Internal", status: "COMPLETED", relatedPhase: "Build" }),
         act({ date: "2026-06-29", activityType: "DISCUSSION", description: "G3 CD pipeline configuration discussed", ownerType: "DevOps", owner: "HSBC DevOps", dependencySide: "Client", status: "COMPLETED", relatedPhase: "Deployment Planning", impact: "Finalize deployment architecture" }),
-        act({ date: "2026-07-09", activityType: "DELIVERABLE", description: "VAPT report shared", ownerType: "Security", owner: "IDfy Security", dependencySide: "Internal", status: "COMPLETED", relatedPhase: "Security Review", notes: "Dependency: HSBC security review" }),
-        act({ date: "2026-08-12", activityType: "DEPLOYMENT", description: "Infrastructure deployment started", ownerType: "DevOps", owner: "HSBC DevOps", dependencySide: "Client", requestedBy: "IDfy", requestedDate: "2026-08-12", expectedDate: "2026-08-13", receivedDate: "", status: "WAITING", relatedPhase: "Deployment", impact: "Deployment delayed" }),
-        act({ date: "2026-08-14", activityType: "REQUEST", description: "API encryption confirmation requested", ownerType: "DevOps", owner: "HSBC DevOps", dependencySide: "Client", requestedBy: "IDfy", requestedDate: "2026-08-14", expectedDate: "2026-08-15", receivedDate: "", status: "WAITING", relatedPhase: "Deployment" })
+        act({ date: "2026-07-09", activityType: "DELIVERABLE", description: "VAPT report shared", ownerType: "Security", owner: "Security Team", dependencySide: "Internal", status: "COMPLETED", relatedPhase: "Security Review", notes: "Dependency: HSBC security review" }),
+        act({ date: "2026-08-12", activityType: "DEPLOYMENT", description: "Infrastructure deployment started", ownerType: "DevOps", owner: "HSBC DevOps", dependencySide: "Client", requestedBy: "Ankur Katyarmal", requestedDate: "2026-08-12", expectedDate: "2026-08-13", receivedDate: "", status: "WAITING", relatedPhase: "Deployment", impact: "Deployment delayed" }),
+        act({ date: "2026-08-14", activityType: "REQUEST", description: "API encryption confirmation requested", ownerType: "DevOps", owner: "HSBC DevOps", dependencySide: "Client", requestedBy: "Ankur Katyarmal", requestedDate: "2026-08-14", expectedDate: "2026-08-15", receivedDate: "", status: "WAITING", relatedPhase: "Deployment" })
       ],
       auditLog: [
         { date: "2026-08-14", text: "Status changed: In Progress → Blocked" },
@@ -362,7 +362,7 @@ var Data = (function () {
       projectType: "POC",
       environment: "SaaS",
       cloudProvider: "",
-      infrastructureOwnership: "IDfy",
+      infrastructureOwnership: "Internal",
       owner: "Ankur",
       startDate: "2026-07-01",
       targetDate: "2026-08-30",
@@ -372,12 +372,12 @@ var Data = (function () {
       description: "Vehicle loan journey consent capture via iFrame-embedded Privy CMS, webhook-driven confirmation.",
       activities: [
         act({ date: "2026-07-01", activityType: "MEETING", description: "Kickoff call — journey mapping for Digital Apna Vahan", ownerType: "Project / PM", owner: "Ankur", dependencySide: "Internal", status: "COMPLETED" }),
-        act({ date: "2026-07-08", activityType: "DELIVERABLE", description: "FSD V1 shared with PSB IT team", ownerType: "Internal Tech Team", owner: "IDfy", dependencySide: "Internal", status: "COMPLETED" }),
-        act({ date: "2026-07-15", activityType: "REQUEST", description: "Requested confirmation on consent-before-OTP sequencing", ownerType: "Client", owner: "PSB IT", dependencySide: "Client", requestedBy: "IDfy", requestedDate: "2026-07-15", expectedDate: "2026-07-18", receivedDate: "2026-07-22", status: "RECEIVED" }),
+        act({ date: "2026-07-08", activityType: "DELIVERABLE", description: "FSD V1 shared with PSB IT team", ownerType: "Internal Tech Team", owner: "Ankur Katyarmal", dependencySide: "Internal", status: "COMPLETED" }),
+        act({ date: "2026-07-15", activityType: "REQUEST", description: "Requested confirmation on consent-before-OTP sequencing", ownerType: "Client", owner: "PSB IT", dependencySide: "Client", requestedBy: "Ankur Katyarmal", requestedDate: "2026-07-15", expectedDate: "2026-07-18", receivedDate: "2026-07-22", status: "RECEIVED" }),
         act({ date: "2026-07-24", activityType: "DECISION", description: "Removed postMessage/JS listener mechanism in favour of webhook confirmation", ownerType: "Project / PM", owner: "Ankur", dependencySide: "Internal", status: "COMPLETED" }),
-        act({ date: "2026-08-02", activityType: "DELIVERABLE", description: "FSD V4 and standalone iFrame integration guide delivered", ownerType: "Internal Tech Team", owner: "IDfy", dependencySide: "Internal", status: "COMPLETED" }),
-        act({ date: "2026-08-11", activityType: "UAT", description: "UAT environment access requested from PSB", ownerType: "Client", owner: "PSB DevOps", dependencySide: "Client", requestedBy: "IDfy", requestedDate: "2026-08-11", expectedDate: "2026-08-13", receivedDate: "2026-08-13", status: "RECEIVED" }),
-        act({ date: "2026-08-13", activityType: "UAT", description: "UAT execution started on webhook confirmation flow", ownerType: "Internal Tech Team", owner: "IDfy", dependencySide: "Internal", status: "OPEN" })
+        act({ date: "2026-08-02", activityType: "DELIVERABLE", description: "FSD V4 and standalone iFrame integration guide delivered", ownerType: "Internal Tech Team", owner: "Ankur Katyarmal", dependencySide: "Internal", status: "COMPLETED" }),
+        act({ date: "2026-08-11", activityType: "UAT", description: "UAT environment access requested from PSB", ownerType: "Client", owner: "PSB DevOps", dependencySide: "Client", requestedBy: "Ankur Katyarmal", requestedDate: "2026-08-11", expectedDate: "2026-08-13", receivedDate: "2026-08-13", status: "RECEIVED" }),
+        act({ date: "2026-08-13", activityType: "UAT", description: "UAT execution started on webhook confirmation flow", ownerType: "Internal Tech Team", owner: "Ankur Katyarmal", dependencySide: "Internal", status: "OPEN" })
       ],
       auditLog: [
         { date: "2026-08-13", text: "Status changed: In Progress → UAT" },
@@ -403,9 +403,9 @@ var Data = (function () {
       description: "Data discovery and classification rollout across Axis on-prem clusters.",
       activities: [
         act({ date: "2026-05-20", activityType: "MEETING", description: "Project kickoff and scoping", ownerType: "Project / PM", owner: "Ankur", dependencySide: "Internal", status: "COMPLETED" }),
-        act({ date: "2026-06-02", activityType: "REQUEST", description: "Requested cluster port access list from Axis network team", ownerType: "Client", owner: "Axis Network Team", dependencySide: "Client", requestedBy: "IDfy", requestedDate: "2026-06-02", expectedDate: "2026-06-05", receivedDate: "2026-06-20", status: "RECEIVED", impact: "Delayed environment setup by 2 weeks" }),
-        act({ date: "2026-06-22", activityType: "ACTION", description: "Cluster connectivity established", ownerType: "Internal Tech Team", owner: "IDfy Engineering", dependencySide: "Internal", status: "COMPLETED" }),
-        act({ date: "2026-07-05", activityType: "BLOCKER", description: "Firewall rules blocking classification scans", ownerType: "DevOps", owner: "Axis Infra", dependencySide: "Client", requestedBy: "IDfy", requestedDate: "2026-07-05", expectedDate: "2026-07-08", receivedDate: "", status: "BLOCKED", impact: "Classification jobs cannot run" }),
+        act({ date: "2026-06-02", activityType: "REQUEST", description: "Requested cluster port access list from Axis network team", ownerType: "Client", owner: "Axis Network Team", dependencySide: "Client", requestedBy: "Ankur Katyarmal", requestedDate: "2026-06-02", expectedDate: "2026-06-05", receivedDate: "2026-06-20", status: "RECEIVED", impact: "Delayed environment setup by 2 weeks" }),
+        act({ date: "2026-06-22", activityType: "ACTION", description: "Cluster connectivity established", ownerType: "Internal Tech Team", owner: "Engineering Team", dependencySide: "Internal", status: "COMPLETED" }),
+        act({ date: "2026-07-05", activityType: "BLOCKER", description: "Firewall rules blocking classification scans", ownerType: "DevOps", owner: "Axis Infra", dependencySide: "Client", requestedBy: "Ankur Katyarmal", requestedDate: "2026-07-05", expectedDate: "2026-07-08", receivedDate: "", status: "BLOCKED", impact: "Classification jobs cannot run" }),
         act({ date: "2026-07-20", activityType: "DISCUSSION", description: "Escalation call with Axis IT leadership on firewall delay", ownerType: "Project / PM", owner: "Ankur", dependencySide: "Internal", status: "COMPLETED" }),
         act({ date: "2026-08-01", activityType: "STATUS UPDATE", description: "Leadership briefing and delay timeline shared internally", ownerType: "Project / PM", owner: "Ankur", dependencySide: "Internal", status: "COMPLETED" })
       ],
@@ -433,7 +433,7 @@ var Data = (function () {
       description: "Initial CGP proof of concept for wealth management consent flows.",
       activities: [
         act({ date: "2026-07-28", activityType: "MEETING", description: "Discovery call with Nuvama compliance team", ownerType: "Project / PM", owner: "Ankur", dependencySide: "Internal", status: "COMPLETED" }),
-        act({ date: "2026-08-10", activityType: "REQUEST", description: "Sandbox AWS account details requested", ownerType: "Client", owner: "Nuvama IT", dependencySide: "Client", requestedBy: "IDfy", requestedDate: "2026-08-10", expectedDate: "2026-08-17", receivedDate: "", status: "WAITING" })
+        act({ date: "2026-08-10", activityType: "REQUEST", description: "Sandbox AWS account details requested", ownerType: "Client", owner: "Nuvama IT", dependencySide: "Client", requestedBy: "Ankur Katyarmal", requestedDate: "2026-08-10", expectedDate: "2026-08-17", receivedDate: "", status: "WAITING" })
       ],
       auditLog: [
         { date: "2026-07-28", text: "Project created" }
@@ -448,7 +448,7 @@ var Data = (function () {
       projectType: "LIVE",
       environment: "Cloud",
       cloudProvider: "Azure",
-      infrastructureOwnership: "IDfy",
+      infrastructureOwnership: "Internal",
       owner: "Ankur",
       startDate: "2026-05-01",
       targetDate: "2026-07-15",
@@ -458,8 +458,8 @@ var Data = (function () {
       description: "Cookie Consent Manager implementation across policy microsites.",
       activities: [
         act({ date: "2026-05-01", activityType: "MEETING", description: "Kickoff", ownerType: "Project / PM", owner: "Ankur", dependencySide: "Internal", status: "COMPLETED" }),
-        act({ date: "2026-06-10", activityType: "DEPLOYMENT", description: "Production deployment completed", ownerType: "Internal Tech Team", owner: "IDfy Engineering", dependencySide: "Internal", status: "COMPLETED" }),
-        act({ date: "2026-07-15", activityType: "PRODUCTION", description: "Go-live sign-off received", ownerType: "Client", owner: "ICICI Lombard IT", dependencySide: "Client", requestedBy: "IDfy", requestedDate: "2026-07-10", expectedDate: "2026-07-12", receivedDate: "2026-07-15", status: "RECEIVED" })
+        act({ date: "2026-06-10", activityType: "DEPLOYMENT", description: "Production deployment completed", ownerType: "Internal Tech Team", owner: "Engineering Team", dependencySide: "Internal", status: "COMPLETED" }),
+        act({ date: "2026-07-15", activityType: "PRODUCTION", description: "Go-live sign-off received", ownerType: "Client", owner: "ICICI Lombard IT", dependencySide: "Client", requestedBy: "Ankur Katyarmal", requestedDate: "2026-07-10", expectedDate: "2026-07-12", receivedDate: "2026-07-15", status: "RECEIVED" })
       ],
       auditLog: [
         { date: "2026-07-15", text: "Status changed: UAT → Completed" }
@@ -474,7 +474,7 @@ var Data = (function () {
       projectType: "POC",
       environment: "SaaS",
       cloudProvider: "",
-      infrastructureOwnership: "IDfy",
+      infrastructureOwnership: "Internal",
       owner: "Ankur",
       startDate: "2026-08-08",
       targetDate: "2026-09-30",
@@ -483,7 +483,7 @@ var Data = (function () {
       modules: ["DPIA"],
       description: "Data Protection Impact Assessment scoping for pharma distribution systems.",
       activities: [
-        act({ date: "2026-08-08", activityType: "REQUEST", description: "Initial scoping questionnaire sent to Alkem", ownerType: "Client", owner: "Alkem Compliance", dependencySide: "Client", requestedBy: "IDfy", requestedDate: "2026-08-08", expectedDate: "2026-08-18", receivedDate: "", status: "OPEN" })
+        act({ date: "2026-08-08", activityType: "REQUEST", description: "Initial scoping questionnaire sent to Alkem", ownerType: "Client", owner: "Alkem Compliance", dependencySide: "Client", requestedBy: "Ankur Katyarmal", requestedDate: "2026-08-08", expectedDate: "2026-08-18", receivedDate: "", status: "OPEN" })
       ],
       auditLog: [
         { date: "2026-08-08", text: "Project created" }
@@ -508,7 +508,7 @@ var Data = (function () {
       description: "Third-party risk management and breach workflow integration, on-prem deployment.",
       activities: [
         act({ date: "2026-06-15", activityType: "MEETING", description: "Kickoff and architecture review", ownerType: "Project / PM", owner: "Ankur", dependencySide: "Internal", status: "COMPLETED" }),
-        act({ date: "2026-07-01", activityType: "REQUEST", description: "On-prem server provisioning requested", ownerType: "Client", owner: "Adani IT", dependencySide: "Client", requestedBy: "IDfy", requestedDate: "2026-07-01", expectedDate: "2026-07-10", receivedDate: "", status: "BLOCKED", impact: "Cannot begin installation without provisioned servers" })
+        act({ date: "2026-07-01", activityType: "REQUEST", description: "On-prem server provisioning requested", ownerType: "Client", owner: "Adani IT", dependencySide: "Client", requestedBy: "Ankur Katyarmal", requestedDate: "2026-07-01", expectedDate: "2026-07-10", receivedDate: "", status: "BLOCKED", impact: "Cannot begin installation without provisioned servers" })
       ],
       auditLog: [
         { date: "2026-07-15", text: "Status changed: Planned → Blocked" }
@@ -533,8 +533,8 @@ var Data = (function () {
       description: "Classification rollout across five connected data assets for Godrej group entities.",
       activities: [
         act({ date: "2026-06-20", activityType: "MEETING", description: "Kickoff — five connected assets scoped", ownerType: "Project / PM", owner: "Ankur", dependencySide: "Internal", status: "COMPLETED" }),
-        act({ date: "2026-07-18", activityType: "ACTION", description: "Classification completed on 3 of 5 assets", ownerType: "Internal Tech Team", owner: "IDfy Engineering", dependencySide: "Internal", status: "COMPLETED" }),
-        act({ date: "2026-08-05", activityType: "REQUEST", description: "Access credentials requested for remaining 2 assets", ownerType: "Client", owner: "Godrej IT", dependencySide: "Client", requestedBy: "IDfy", requestedDate: "2026-08-05", expectedDate: "2026-08-09", receivedDate: "", status: "WAITING" })
+        act({ date: "2026-07-18", activityType: "ACTION", description: "Classification completed on 3 of 5 assets", ownerType: "Internal Tech Team", owner: "Engineering Team", dependencySide: "Internal", status: "COMPLETED" }),
+        act({ date: "2026-08-05", activityType: "REQUEST", description: "Access credentials requested for remaining 2 assets", ownerType: "Client", owner: "Godrej IT", dependencySide: "Client", requestedBy: "Ankur Katyarmal", requestedDate: "2026-08-05", expectedDate: "2026-08-09", receivedDate: "", status: "WAITING" })
       ],
       auditLog: [
         { date: "2026-08-05", text: "Dependency added: Godrej IT — access credentials" }
