@@ -1,6 +1,6 @@
-# IDfy Project Tracker
+# Project Tracker
 
-A project portfolio and delivery tracker for IDfy/Privy client engagements.
+A project portfolio and delivery tracker for client engagements.
 Answers: what's currently active, what was requested, who owns the pending
 dependency, how long has it been waiting, and how much elapsed time was
 active work versus time lost to dependencies.
@@ -30,7 +30,7 @@ than enough for a team tracker.
 
 ### 1. Create a Firebase project
 1. Go to [console.firebase.google.com](https://console.firebase.google.com) → **Add project**.
-2. Name it anything (e.g. `idfy-project-tracker`). Google Analytics is optional — you can skip it.
+2. Name it anything (e.g. `client-project-tracker`). Google Analytics is optional — you can skip it.
 
 ### 2. Enable Google sign-in
 1. In the console: **Build → Authentication → Get started**.
