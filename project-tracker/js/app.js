@@ -388,7 +388,7 @@ var App = (function () {
       return '<div class="stat-card ' + (cls || "") + '"><div class="stat-value">' + value + '</div><div class="stat-label">' + label + "</div></div>";
     }
 
-    var html = '<div class="page-header"><h1>IDfy Project Tracker</h1><p class="page-subtitle">Portfolio overview and delivery health</p></div>';
+    var html = '<div class="page-header"><h1>Ankur\'s Project Tracker</h1><p class="page-subtitle">Portfolio overview and delivery health</p></div>';
     html += scopedViewBanner();
     if (!projects.length) {
       html += '<div class="empty-state">No projects yet. ' + (perms().canAddProjects ? 'Use <strong>+ Add Project</strong>, or go to Settings to import data or load sample data.' : 'Ask an admin to add projects or grant you access.') + '</div>';

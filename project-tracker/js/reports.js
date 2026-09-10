@@ -84,7 +84,7 @@ var Reports = (function () {
 
     var html = "";
     html += "<div class='rp-header'>" +
-      "<div><div class='rp-brand'>IDfy — by IDfy</div><div class='rp-brand-sub'>Privy Project Delivery Report</div>" +
+      "<div><div class='rp-brand'>Ankur's Project Tracker</div><div class='rp-brand-sub'>Privy Project Delivery Report</div>" +
       "<h1 class='rp-title'>" + esc(project.client) + " — " + esc(project.projectName) + "</h1></div>" +
       "<div class='rp-meta'>Generated " + Data.formatDate(Data.todayStr()) + "<br>Owner: " + esc(project.owner) + "</div>" +
       "</div>";
@@ -174,7 +174,7 @@ var Reports = (function () {
 
     var html = "";
     html += "<div class='rp-header'>" +
-      "<div><div class='rp-brand'>IDfy — by IDfy</div><div class='rp-brand-sub'>Weekly Delivery Status Update</div>" +
+      "<div><div class='rp-brand'>Ankur's Project Tracker</div><div class='rp-brand-sub'>Weekly Delivery Status Update</div>" +
       "<h1 class='rp-title'>Portfolio Status — " + Data.formatDate(fromDate) + " to " + Data.formatDate(toDate) + "</h1></div>" +
       "<div class='rp-meta'>Generated " + Data.formatDate(Data.todayStr()) + "</div>" +
       "</div>";
@@ -245,7 +245,7 @@ var Reports = (function () {
 
     var html = "";
     html += "<div class='rp-header'>" +
-      "<div><div class='rp-brand'>IDfy — by IDfy</div><div class='rp-brand-sub'>Proof of Concept — Scope & Kickoff Document</div>" +
+      "<div><div class='rp-brand'>Ankur's Project Tracker</div><div class='rp-brand-sub'>Proof of Concept — Scope & Kickoff Document</div>" +
       "<h1 class='rp-title'>" + esc(f.client) + " — " + esc(f.projectName) + "</h1></div>" +
       "<div class='rp-meta'>Generated " + Data.formatDate(Data.todayStr()) + "<br>Owner: " + esc(f.owner || "—") + "</div>" +
       "</div>";
@@ -278,7 +278,7 @@ var Reports = (function () {
 
     var html = "";
     html += "<div class='rp-header'>" +
-      "<div><div class='rp-brand'>IDfy — by IDfy</div><div class='rp-brand-sub'>Proof of Concept — Completion Report</div>" +
+      "<div><div class='rp-brand'>Ankur's Project Tracker</div><div class='rp-brand-sub'>Proof of Concept — Completion Report</div>" +
       "<h1 class='rp-title'>" + esc(f.client) + " — " + esc(f.projectName) + "</h1></div>" +
       "<div class='rp-meta'>Generated " + Data.formatDate(Data.todayStr()) + "<br>Owner: " + esc(f.owner || "—") + "</div>" +
       "</div>";
