@@ -72,6 +72,11 @@ var Reports = (function () {
       "ul.rp-list{margin:0;padding-left:18px;font-size:12px;}",
       "ul.rp-list li{margin-bottom:5px;}",
       ".rp-module-tag{display:inline-block;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.4px;background:" + BRAND.navyTint + ";color:" + BRAND.navy + ";padding:3px 10px;border-radius:4px;margin-bottom:8px;}",
+      ".rp-page-break{page-break-before:always;}",
+      ".rp-project-block{border:1px solid #E3E6EE;border-radius:8px;padding:20px 22px;margin-bottom:20px;}",
+      ".rp-project-header{display:flex;justify-content:space-between;align-items:baseline;border-bottom:2px solid " + BRAND.navy + ";padding-bottom:8px;margin-bottom:14px;}",
+      ".rp-project-title{font-size:16px;font-weight:700;color:" + BRAND.navy + ";margin:0;}",
+      ".rp-project-sub{font-size:11px;color:" + BRAND.grey + ";}",
       "@media print{.no-print{display:none !important;} body{padding:0;} #reportRoot{padding:0 6mm;max-width:none;} @page{margin:14mm;}}"
     ].join("\n");
   }
@@ -399,5 +404,143 @@ var Reports = (function () {
     setTimeout(function () { try { win.focus(); } catch (e) {} }, 300);
   }
 
-  return { projectReport: projectReport, weeklyReport: weeklyReport, allRisksReport: allRisksReport, pocKickoffReport: pocKickoffReport, pocCompletionReport: pocCompletionReport };
+  // -------------------------------------------------- holistic report (everything, every project)
+  function projectDetailBlockHtml(project, isFirst) {
+    var a = Data.calcProjectAnalytics(project);
+    var dep = Data.currentDependency(project);
+    var statusLabel = (Data.STATUSES.filter(function (s) { return s.key === project.status; })[0] || {}).label || project.status;
+
+    var html = "<div class='rp-project-block" + (isFirst ? "" : " rp-page-break") + "'>";
+    html += "<div class='rp-project-header'>" +
+      "<div><div class='rp-project-title'>" + esc(project.client) + " — " + esc(project.projectName) + "</div>" +
+      "<div class='rp-project-sub'>Owner: " + esc(project.owner || "—") + "</div></div>" +
+      "<div class='rp-project-sub'>" +
+      "<span class='rp-badge " + (project.projectType === "LIVE" ? "rp-badge-live" : "rp-badge-poc") + "'>" + project.projectType + "</span>" +
+      " &nbsp; " + esc(statusLabel) + " · " + esc(project.health) +
+      "</div></div>";
+
+    html += "<div class='rp-stat-row'>";
+    html += statBlock("Total Elapsed", a.totalElapsed + "d");
+    html += statBlock("Active Work", a.activeWork + "d");
+    html += statBlock("Client Waiting", a.clientWaiting + "d");
+    html += statBlock("Internal Waiting", a.internalWaiting + "d");
+    html += "</div>";
+
+    html += "<div class='rp-grid' style='margin-bottom:14px;'>";
+    html += gridItem("Environment", Kanban.envLabel(project));
+    html += gridItem("Infrastructure Ownership", project.infrastructureOwnership);
+    html += gridItem("Start Date", Data.formatDate(project.startDate));
+    html += gridItem("Target Date", Data.formatDate(project.targetDate));
+    html += gridItem("Modules", (project.modules || []).join(", ") || "—");
+    html += "</div>";
+    if (project.description) html += "<p style='font-size:12px;color:#555;margin:-6px 0 14px;'>" + esc(project.description) + "</p>";
+
+    html += "<div style='margin-bottom:14px;'><div class='rp-label' style='margin-bottom:4px;'>Current Dependency</div>";
+    if (dep) {
+      var w = Data.calcWaiting(dep);
+      html += "<div style='font-size:12px;'>" + esc(dep.description) + " — <strong>" + esc(dep.owner) + "</strong> (" + esc(dep.dependencySide) + "), waiting " + w.days + " day(s)</div>";
+    } else {
+      html += "<div class='rp-empty'>No outstanding dependency.</div>";
+    }
+    html += "</div>";
+
+    var risks = sortRisksBySeverity(project.risks || []);
+    html += "<div style='margin-bottom:14px;'><div class='rp-label' style='margin-bottom:6px;'>Risk Register</div>";
+    if (!risks.length) {
+      html += "<div class='rp-empty'>No risks logged.</div>";
+    } else {
+      html += "<table class='rp-table'><thead><tr><th>Score</th><th>Category</th><th>Description</th><th>Status</th><th>Owner</th><th>Target</th></tr></thead><tbody>";
+      risks.forEach(function (r) {
+        html += "<tr><td><span class='rp-badge " + riskBadgeClass(r.riskScore) + "'>" + esc(r.riskScore) + "</span></td>" +
+          "<td>" + esc(r.category) + "</td><td>" + esc(r.description) + "</td>" +
+          "<td>" + esc(r.status) + "</td><td>" + esc(r.owner || "—") + "</td>" +
+          "<td>" + (r.targetResolutionDate ? Data.formatDate(r.targetResolutionDate) : "—") + "</td></tr>";
+      });
+      html += "</tbody></table>";
+    }
+    html += "</div>";
+
+    var activities = (project.activities || []).slice().sort(function (x, y) { return (x.date || "").localeCompare(y.date || ""); });
+    html += "<div><div class='rp-label' style='margin-bottom:6px;'>Activity Timeline</div>";
+    if (!activities.length) {
+      html += "<div class='rp-empty'>No activities logged.</div>";
+    } else {
+      activities.forEach(function (act) {
+        var sideClass = act.dependencySide === "Client" ? "client" : "";
+        html += "<div class='rp-timeline-item " + sideClass + "'>" +
+          "<span class='rp-timeline-date'>" + Data.formatDate(act.date) + "</span>" +
+          esc(act.ownerType) + " · " + esc(act.owner || "—") + " — " + esc(act.description) +
+          (act.status ? " <em>(" + esc(act.status) + ")</em>" : "") +
+          "</div>";
+      });
+    }
+    html += "</div></div>";
+    return html;
+  }
+
+  function holisticReport(projects) {
+    var win = shellOpen("Holistic Portfolio Report");
+    if (!win) return;
+
+    var total = projects.length;
+    var live = projects.filter(function (p) { return p.projectType === "LIVE"; }).length;
+    var poc = projects.filter(function (p) { return p.projectType === "POC"; }).length;
+    var blocked = projects.filter(function (p) { return p.status === "blocked"; }).length;
+    var atRisk = projects.filter(function (p) { return p.health === "AT RISK"; }).length;
+    var inProgress = projects.filter(function (p) { return p.status === "in-progress"; }).length;
+
+    var totalWaiting = 0, totalElapsed = 0, openRisks = 0, criticalRisks = 0;
+    projects.forEach(function (p) {
+      var a = Data.calcProjectAnalytics(p);
+      totalWaiting += a.totalWaiting; totalElapsed += a.totalElapsed;
+      (p.risks || []).forEach(function (r) {
+        if (r.status !== "Closed") { openRisks++; if (r.riskScore === "Critical") criticalRisks++; }
+      });
+    });
+
+    var html = "";
+    html += "<div class='rp-header'>" +
+      "<div><div class='rp-brand'>Ankur's Project Tracker</div><div class='rp-brand-sub'>Holistic Portfolio Report — All Projects & Risks</div>" +
+      "<h1 class='rp-title'>Full Portfolio Report</h1></div>" +
+      "<div class='rp-meta'>Generated " + Data.formatDate(Data.todayStr()) + "<br>" + total + " project(s)</div>" +
+      "</div>";
+
+    html += "<div class='rp-stat-row'>";
+    html += statBlock("Total Projects", total);
+    html += statBlock("Live", live);
+    html += statBlock("POC", poc);
+    html += statBlock("Blocked", blocked);
+    html += statBlock("At Risk", atRisk);
+    html += statBlock("In Progress", inProgress);
+    html += "</div>";
+    html += "<div class='rp-stat-row'>";
+    html += statBlock("Total Waiting", totalWaiting + "d");
+    html += statBlock("Total Elapsed", totalElapsed + "d");
+    html += statBlock("Open Risks", openRisks);
+    html += statBlock("Critical Risks", criticalRisks);
+    html += "</div>";
+
+    html += "<div class='rp-section'><div class='rp-section-title'>Portfolio Summary</div>";
+    html += "<table class='rp-table'><thead><tr><th>Client</th><th>Project</th><th>Type</th><th>Status</th><th>Health</th><th>Waiting</th><th>Open Risks</th></tr></thead><tbody>";
+    projects.forEach(function (p) {
+      var a = Data.calcProjectAnalytics(p);
+      var statusLabel = (Data.STATUSES.filter(function (s) { return s.key === p.status; })[0] || {}).label || p.status;
+      var pOpenRisks = (p.risks || []).filter(function (r) { return r.status !== "Closed"; }).length;
+      html += "<tr><td>" + esc(p.client) + "</td><td>" + esc(p.projectName) + "</td>" +
+        "<td><span class='rp-badge " + (p.projectType === "LIVE" ? "rp-badge-live" : "rp-badge-poc") + "'>" + p.projectType + "</span></td>" +
+        "<td>" + esc(statusLabel) + "</td><td>" + esc(p.health) + "</td>" +
+        "<td>" + (a.totalWaiting > 0 ? a.totalWaiting + "d" : "—") + "</td>" +
+        "<td>" + (pOpenRisks > 0 ? pOpenRisks : "—") + "</td></tr>";
+    });
+    html += "</tbody></table></div>";
+
+    html += "<div class='rp-section'><div class='rp-section-title'>Project Detail</div>";
+    projects.forEach(function (p, i) { html += projectDetailBlockHtml(p, i === 0); });
+    html += "</div>";
+
+    win.document.getElementById("reportRoot").innerHTML = html;
+    setTimeout(function () { try { win.focus(); } catch (e) {} }, 300);
+  }
+
+  return { projectReport: projectReport, weeklyReport: weeklyReport, allRisksReport: allRisksReport, holisticReport: holisticReport, pocKickoffReport: pocKickoffReport, pocCompletionReport: pocCompletionReport };
 })();
