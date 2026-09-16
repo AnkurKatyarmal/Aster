@@ -418,9 +418,6 @@ var App = (function () {
     html += statCard("Internal Waiting (days)", internalWaiting, "stat-mono");
     html += statCard("Active Work (days)", activeWork, "stat-mono");
     html += statCard("Total Elapsed (days)", totalElapsed, "stat-mono");
-    html += "</div>";
-
-    html += '<div class="stat-grid stat-grid-secondary">';
     html += statCard("Open Risks", openRisks, "stat-amber");
     html += statCard("Critical Risks", criticalRisks, "stat-red");
     html += "</div>";
@@ -615,6 +612,9 @@ var App = (function () {
     html += '<div class="settings-card"><h3>Risk Register Report</h3><p>Every risk across every project, most severe first — for a leadership or client-facing risk review.</p>';
     html += '<div class="settings-actions"><button class="btn btn-primary" id="btnGenRiskReport">Generate Risk Register Report</button></div></div>';
 
+    html += '<div class="settings-card"><h3>Holistic Portfolio Report</h3><p>Everything, for every project, in one document — full project detail (info, dependency, timeline) plus its risk register, across the whole portfolio.</p>';
+    html += '<div class="settings-actions"><button class="btn btn-primary" id="btnGenHolisticReport">Generate Holistic Report</button></div></div>';
+
     main.innerHTML = html;
 
     $("#btnNewPoc").addEventListener("click", openNewPocModal);
@@ -630,6 +630,9 @@ var App = (function () {
     });
     $("#btnGenRiskReport").addEventListener("click", function () {
       Reports.allRisksReport(state.projects);
+    });
+    $("#btnGenHolisticReport").addEventListener("click", function () {
+      Reports.holisticReport(state.projects);
     });
   }
 
