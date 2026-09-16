@@ -589,9 +589,10 @@ var App = (function () {
       return;
     }
 
-    html += '<div class="settings-card"><h3>Project Report</h3><p>A full delivery report for a single project — info, current dependency, waiting-time analytics, and the complete activity timeline.</p>';
+    html += '<div class="settings-card"><h3>Project Report</h3><p>A full delivery report for a single project — info, current dependency, waiting-time analytics, and the complete activity timeline. Or pick "All Projects (Holistic)" for every project\'s full detail plus risk register, in one document.</p>';
     html += '<div class="settings-actions">';
-    html += '<select id="reportProjectSelect">' + state.projects.map(function (p) { return '<option value="' + p.id + '">' + esc(p.client) + " — " + esc(p.projectName) + "</option>"; }).join("") + "</select>";
+    html += '<select id="reportProjectSelect"><option value="__all__">All Projects (Holistic Report)</option>' +
+      state.projects.map(function (p) { return '<option value="' + p.id + '">' + esc(p.client) + " — " + esc(p.projectName) + "</option>"; }).join("") + "</select>";
     html += '<button class="btn btn-primary" id="btnGenProjectReport">Generate Project Report</button>';
     html += "</div></div>";
 
@@ -612,17 +613,27 @@ var App = (function () {
     html += '<div class="settings-card"><h3>Risk Register Report</h3><p>Every risk across every project, most severe first — for a leadership or client-facing risk review.</p>';
     html += '<div class="settings-actions"><button class="btn btn-primary" id="btnGenRiskReport">Generate Risk Register Report</button></div></div>';
 
-    html += '<div class="settings-card"><h3>Holistic Portfolio Report</h3><p>Everything, for every project, in one document — full project detail (info, dependency, timeline) plus its risk register, across the whole portfolio.</p>';
-    html += '<div class="settings-actions"><button class="btn btn-primary" id="btnGenHolisticReport">Generate Holistic Report</button></div></div>';
-
     main.innerHTML = html;
 
     $("#btnNewPoc").addEventListener("click", openNewPocModal);
     $("#btnPocCompletion").addEventListener("click", openPocCompletionModal);
 
     if (!state.projects.length) return;
-    $("#btnGenProjectReport").addEventListener("click", function () {
-      var project = findProject($("#reportProjectSelect").value);
+
+    var reportSelect = $("#reportProjectSelect");
+    var genProjectBtn = $("#btnGenProjectReport");
+    function updateProjectReportButtonLabel() {
+      genProjectBtn.textContent = reportSelect.value === "__all__" ? "Generate Holistic Report" : "Generate Project Report";
+    }
+    reportSelect.addEventListener("change", updateProjectReportButtonLabel);
+    updateProjectReportButtonLabel();
+
+    genProjectBtn.addEventListener("click", function () {
+      if (reportSelect.value === "__all__") {
+        Reports.holisticReport(state.projects);
+        return;
+      }
+      var project = findProject(reportSelect.value);
       if (project) Reports.projectReport(project);
     });
     $("#btnGenWeeklyReport").addEventListener("click", function () {
@@ -630,9 +641,6 @@ var App = (function () {
     });
     $("#btnGenRiskReport").addEventListener("click", function () {
       Reports.allRisksReport(state.projects);
-    });
-    $("#btnGenHolisticReport").addEventListener("click", function () {
-      Reports.holisticReport(state.projects);
     });
   }
 
