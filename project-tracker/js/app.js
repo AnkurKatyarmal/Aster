@@ -612,6 +612,9 @@ var App = (function () {
     html += '<button class="btn btn-primary" id="btnGenWeeklyReport">Generate Weekly Report</button>';
     html += "</div></div>";
 
+    html += '<div class="settings-card"><h3>Risk Register Report</h3><p>Every risk across every project, most severe first — for a leadership or client-facing risk review.</p>';
+    html += '<div class="settings-actions"><button class="btn btn-primary" id="btnGenRiskReport">Generate Risk Register Report</button></div></div>';
+
     main.innerHTML = html;
 
     $("#btnNewPoc").addEventListener("click", openNewPocModal);
@@ -624,6 +627,9 @@ var App = (function () {
     });
     $("#btnGenWeeklyReport").addEventListener("click", function () {
       Reports.weeklyReport(state.projects, $("#weeklyFrom").value, $("#weeklyTo").value);
+    });
+    $("#btnGenRiskReport").addEventListener("click", function () {
+      Reports.allRisksReport(state.projects);
     });
   }
 
