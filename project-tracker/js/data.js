@@ -6,7 +6,23 @@
 var Data = (function () {
   "use strict";
 
-  var TODAY = new Date("2026-08-14T00:00:00");
+  // The real current date, zeroed to midnight so date-only comparisons
+  // (parseDate() also produces midnight-anchored dates) line up correctly.
+  // IMPORTANT: this must stay dynamic — a hardcoded date here would freeze
+  // every waiting-day / elapsed-day calculation in the whole app at that
+  // fixed point, silently going stale as real time moves forward.
+  var TODAY = new Date();
+  TODAY.setHours(0, 0, 0, 0);
+
+  // Relative-to-today date helpers, used only by sampleProjects() below so
+  // the demo data always reads as "recent" no matter when it's viewed or
+  // reset, instead of drifting into the past as real time moves forward.
+  function daysAgo(n) {
+    var d = new Date(TODAY.getTime());
+    d.setDate(d.getDate() - n);
+    return d.toISOString().slice(0, 10);
+  }
+  function daysFromNow(n) { return daysAgo(-n); }
 
   var PROJECT_TYPES = ["POC", "LIVE"];
 
@@ -351,7 +367,7 @@ var Data = (function () {
 
     var projects = [];
 
-    // 1. HSBC — rich timeline, matches spec example almost verbatim
+    // 1. HSBC — resolved: deployment blocker cleared, now live and stable
     projects.push({
       id: generateId("proj"),
       client: "HSBC",
@@ -361,39 +377,41 @@ var Data = (function () {
       cloudProvider: "GCP",
       infrastructureOwnership: "Client",
       owner: "Ankur",
-      startDate: "2026-06-10",
-      targetDate: "2026-08-25",
-      status: "blocked",
-      health: "AT RISK",
+      startDate: daysAgo(110),
+      targetDate: daysAgo(5),
+      status: "completed",
+      health: "ON TRACK",
       modules: ["CGP", "DPRM", "Cookie Manager"],
       description: "Consent Governance Platform, DPRM and Cookie Manager rollout on HSBC-owned GCP infrastructure.",
       activities: [
-        act({ date: "2026-06-15", activityType: "DELIVERABLE", description: "Docker Hub invitation accepted", ownerType: "Client", owner: "HSBC IT", dependencySide: "Client", status: "RECEIVED", relatedPhase: "Prerequisites" }),
-        act({ date: "2026-06-15", activityType: "DELIVERABLE", description: "Consent form shared", ownerType: "Client", owner: "HSBC DPO", dependencySide: "Client", status: "COMPLETED", relatedPhase: "Prerequisites", notes: "Prerequisites completed" }),
-        act({ date: "2026-06-25", activityType: "DELIVERABLE", description: "UAT SaaS API credentials shared", ownerType: "Internal Tech Team", owner: "Ankur Katyarmal", dependencySide: "Internal", status: "COMPLETED", relatedPhase: "UAT Setup", notes: "Dependency: HSBC DevOps for validation" }),
-        act({ date: "2026-06-29", activityType: "ACTION", description: "Production image preparation started", ownerType: "Internal Tech Team", owner: "Engineering Team", dependencySide: "Internal", status: "COMPLETED", relatedPhase: "Build" }),
-        act({ date: "2026-06-29", activityType: "DISCUSSION", description: "G3 CD pipeline configuration discussed", ownerType: "DevOps", owner: "HSBC DevOps", dependencySide: "Client", status: "COMPLETED", relatedPhase: "Deployment Planning", impact: "Finalize deployment architecture" }),
-        act({ date: "2026-07-09", activityType: "DELIVERABLE", description: "VAPT report shared", ownerType: "Security", owner: "Security Team", dependencySide: "Internal", status: "COMPLETED", relatedPhase: "Security Review", notes: "Dependency: HSBC security review" }),
-        act({ date: "2026-08-12", activityType: "DEPLOYMENT", description: "Infrastructure deployment started", ownerType: "DevOps", owner: "HSBC DevOps", dependencySide: "Client", requestedBy: "Ankur Katyarmal", requestedDate: "2026-08-12", expectedDate: "2026-08-13", receivedDate: "", status: "WAITING", relatedPhase: "Deployment", impact: "Deployment delayed" }),
-        act({ date: "2026-08-14", activityType: "REQUEST", description: "API encryption confirmation requested", ownerType: "DevOps", owner: "HSBC DevOps", dependencySide: "Client", requestedBy: "Ankur Katyarmal", requestedDate: "2026-08-14", expectedDate: "2026-08-15", receivedDate: "", status: "WAITING", relatedPhase: "Deployment" })
+        act({ date: daysAgo(105), activityType: "DELIVERABLE", description: "Docker Hub invitation accepted", ownerType: "Client", owner: "HSBC IT", dependencySide: "Client", status: "RECEIVED", relatedPhase: "Prerequisites" }),
+        act({ date: daysAgo(105), activityType: "DELIVERABLE", description: "Consent form shared", ownerType: "Client", owner: "HSBC DPO", dependencySide: "Client", status: "COMPLETED", relatedPhase: "Prerequisites", notes: "Prerequisites completed" }),
+        act({ date: daysAgo(95), activityType: "DELIVERABLE", description: "UAT SaaS API credentials shared", ownerType: "Internal Tech Team", owner: "Ankur Katyarmal", dependencySide: "Internal", status: "COMPLETED", relatedPhase: "UAT Setup", notes: "Dependency: HSBC DevOps for validation" }),
+        act({ date: daysAgo(91), activityType: "ACTION", description: "Production image preparation started", ownerType: "Internal Tech Team", owner: "Engineering Team", dependencySide: "Internal", status: "COMPLETED", relatedPhase: "Build" }),
+        act({ date: daysAgo(91), activityType: "DISCUSSION", description: "G3 CD pipeline configuration discussed", ownerType: "DevOps", owner: "HSBC DevOps", dependencySide: "Client", status: "COMPLETED", relatedPhase: "Deployment Planning", impact: "Finalize deployment architecture" }),
+        act({ date: daysAgo(81), activityType: "DELIVERABLE", description: "VAPT report shared", ownerType: "Security", owner: "Security Team", dependencySide: "Internal", status: "COMPLETED", relatedPhase: "Security Review", notes: "Dependency: HSBC security review" }),
+        act({ date: daysAgo(35), activityType: "DEPLOYMENT", description: "Infrastructure deployment started", ownerType: "DevOps", owner: "HSBC DevOps", dependencySide: "Client", requestedBy: "Ankur Katyarmal", requestedDate: daysAgo(35), expectedDate: daysAgo(34), receivedDate: daysAgo(30), status: "RECEIVED", relatedPhase: "Deployment", impact: "Deployment delayed by client infra readiness" }),
+        act({ date: daysAgo(33), activityType: "REQUEST", description: "API encryption confirmation requested", ownerType: "DevOps", owner: "HSBC DevOps", dependencySide: "Client", requestedBy: "Ankur Katyarmal", requestedDate: daysAgo(33), expectedDate: daysAgo(32), receivedDate: daysAgo(28), status: "RECEIVED", relatedPhase: "Deployment" }),
+        act({ date: daysAgo(6), activityType: "PRODUCTION", description: "Production go-live completed — CGP, DPRM & Cookie Manager now live on HSBC GCP infrastructure", status: "COMPLETED", relatedPhase: "Go-Live" }),
+        act({ date: daysAgo(2), activityType: "STATUS UPDATE", description: "Post go-live monitoring — no issues reported in first week", status: "COMPLETED" })
       ],
       auditLog: [
-        { date: "2026-08-14", text: "Status changed: In Progress → Blocked" },
-        { date: "2026-08-14", text: "Dependency added: HSBC DevOps — API encryption confirmation" },
-        { date: "2026-08-12", text: "Status changed: Planned → In Progress" }
+        { date: daysAgo(6), text: "Status changed: Blocked → Completed" },
+        { date: daysAgo(30), text: "Dependency resolved: HSBC DevOps — infrastructure deployment received" },
+        { date: daysAgo(35), text: "Status changed: In Progress → Blocked" }
       ],
       risks: [
         {
           id: generateId("risk"), category: "Vendor / Third-Party",
-          description: "HSBC DevOps has been slow to respond on infrastructure deployment and API encryption confirmation — pattern suggests possible resourcing constraints on their side.",
+          description: "HSBC DevOps had been slow to respond on infrastructure deployment and API encryption confirmation — pattern suggested possible resourcing constraints on their side.",
           likelihood: "Medium", impact: "High", riskScore: computeRiskScore("Medium", "High"),
-          status: "Open", owner: "Ankur Katyarmal", mitigationPlan: "Escalate via weekly steering call; propose a dedicated HSBC DevOps point of contact for the remainder of deployment.",
-          identifiedDate: "2026-08-14", targetResolutionDate: "2026-08-21"
+          status: "Closed", owner: "Ankur Katyarmal", mitigationPlan: "Escalated via weekly steering call; a dedicated HSBC DevOps point of contact was assigned for the remainder of deployment.",
+          identifiedDate: daysAgo(33), targetResolutionDate: daysAgo(26)
         }
       ]
     });
 
-    // 2. Punjab & Sind Bank — POC, rich timeline
+    // 2. Punjab & Sind Bank — resolved: UAT signed off, now in production
     projects.push({
       id: generateId("proj"),
       client: "Punjab & Sind Bank",
@@ -403,28 +421,30 @@ var Data = (function () {
       cloudProvider: "",
       infrastructureOwnership: "Internal",
       owner: "Ankur",
-      startDate: "2026-07-01",
-      targetDate: "2026-08-30",
-      status: "uat",
+      startDate: daysAgo(75),
+      targetDate: daysAgo(3),
+      status: "completed",
       health: "ON TRACK",
       modules: ["CGP", "DPRM"],
       description: "Vehicle loan journey consent capture via iFrame-embedded Privy CMS, webhook-driven confirmation.",
       activities: [
-        act({ date: "2026-07-01", activityType: "MEETING", description: "Kickoff call — journey mapping for Digital Apna Vahan", ownerType: "Project / PM", owner: "Ankur", dependencySide: "Internal", status: "COMPLETED" }),
-        act({ date: "2026-07-08", activityType: "DELIVERABLE", description: "FSD V1 shared with PSB IT team", ownerType: "Internal Tech Team", owner: "Ankur Katyarmal", dependencySide: "Internal", status: "COMPLETED" }),
-        act({ date: "2026-07-15", activityType: "REQUEST", description: "Requested confirmation on consent-before-OTP sequencing", ownerType: "Client", owner: "PSB IT", dependencySide: "Client", requestedBy: "Ankur Katyarmal", requestedDate: "2026-07-15", expectedDate: "2026-07-18", receivedDate: "2026-07-22", status: "RECEIVED" }),
-        act({ date: "2026-07-24", activityType: "DECISION", description: "Removed postMessage/JS listener mechanism in favour of webhook confirmation", ownerType: "Project / PM", owner: "Ankur", dependencySide: "Internal", status: "COMPLETED" }),
-        act({ date: "2026-08-02", activityType: "DELIVERABLE", description: "FSD V4 and standalone iFrame integration guide delivered", ownerType: "Internal Tech Team", owner: "Ankur Katyarmal", dependencySide: "Internal", status: "COMPLETED" }),
-        act({ date: "2026-08-11", activityType: "UAT", description: "UAT environment access requested from PSB", ownerType: "Client", owner: "PSB DevOps", dependencySide: "Client", requestedBy: "Ankur Katyarmal", requestedDate: "2026-08-11", expectedDate: "2026-08-13", receivedDate: "2026-08-13", status: "RECEIVED" }),
-        act({ date: "2026-08-13", activityType: "UAT", description: "UAT execution started on webhook confirmation flow", ownerType: "Internal Tech Team", owner: "Ankur Katyarmal", dependencySide: "Internal", status: "OPEN" })
+        act({ date: daysAgo(75), activityType: "MEETING", description: "Kickoff call — journey mapping for Digital Apna Vahan", ownerType: "Project / PM", owner: "Ankur", status: "COMPLETED" }),
+        act({ date: daysAgo(68), activityType: "DELIVERABLE", description: "FSD V1 shared with PSB IT team", status: "COMPLETED" }),
+        act({ date: daysAgo(61), activityType: "REQUEST", description: "Requested confirmation on consent-before-OTP sequencing", ownerType: "Client", owner: "PSB IT", dependencySide: "Client", requestedBy: "Ankur Katyarmal", requestedDate: daysAgo(61), expectedDate: daysAgo(58), receivedDate: daysAgo(54), status: "RECEIVED" }),
+        act({ date: daysAgo(52), activityType: "DECISION", description: "Removed postMessage/JS listener mechanism in favour of webhook confirmation", ownerType: "Project / PM", owner: "Ankur", status: "COMPLETED" }),
+        act({ date: daysAgo(43), activityType: "DELIVERABLE", description: "FSD V4 and standalone iFrame integration guide delivered", status: "COMPLETED" }),
+        act({ date: daysAgo(34), activityType: "UAT", description: "UAT environment access requested from PSB", ownerType: "Client", owner: "PSB DevOps", dependencySide: "Client", requestedBy: "Ankur Katyarmal", requestedDate: daysAgo(34), expectedDate: daysAgo(32), receivedDate: daysAgo(32), status: "RECEIVED" }),
+        act({ date: daysAgo(32), activityType: "UAT", description: "UAT execution started on webhook confirmation flow", status: "COMPLETED" }),
+        act({ date: daysAgo(4), activityType: "UAT", description: "UAT sign-off received from PSB; production rollout approved", ownerType: "Client", owner: "PSB IT", dependencySide: "Client", requestedBy: "Ankur Katyarmal", requestedDate: daysAgo(6), expectedDate: daysAgo(5), receivedDate: daysAgo(4), status: "RECEIVED" }),
+        act({ date: daysAgo(3), activityType: "PRODUCTION", description: "Production rollout completed for Digital Apna Vahan consent journey", status: "COMPLETED", relatedPhase: "Go-Live" })
       ],
       auditLog: [
-        { date: "2026-08-13", text: "Status changed: In Progress → UAT" },
-        { date: "2026-08-02", text: "Activity added: FSD V4 delivered" }
+        { date: daysAgo(3), text: "Status changed: UAT → Completed" },
+        { date: daysAgo(32), text: "Status changed: In Progress → UAT" }
       ]
     });
 
-    // 3. Axis Bank — LIVE, delayed, rich timeline
+    // 3. Axis Bank — resolved: firewall exception approved, classification complete, health recovered
     projects.push({
       id: generateId("proj"),
       client: "Axis Bank",
@@ -434,36 +454,39 @@ var Data = (function () {
       cloudProvider: "",
       infrastructureOwnership: "Client",
       owner: "Ankur",
-      startDate: "2026-05-20",
-      targetDate: "2026-08-05",
+      startDate: daysAgo(120),
+      targetDate: daysFromNow(10),
       status: "in-progress",
-      health: "DELAYED",
+      health: "ON TRACK",
       modules: ["Data Compass"],
       description: "Data discovery and classification rollout across Axis on-prem clusters.",
       activities: [
-        act({ date: "2026-05-20", activityType: "MEETING", description: "Project kickoff and scoping", ownerType: "Project / PM", owner: "Ankur", dependencySide: "Internal", status: "COMPLETED" }),
-        act({ date: "2026-06-02", activityType: "REQUEST", description: "Requested cluster port access list from Axis network team", ownerType: "Client", owner: "Axis Network Team", dependencySide: "Client", requestedBy: "Ankur Katyarmal", requestedDate: "2026-06-02", expectedDate: "2026-06-05", receivedDate: "2026-06-20", status: "RECEIVED", impact: "Delayed environment setup by 2 weeks" }),
-        act({ date: "2026-06-22", activityType: "ACTION", description: "Cluster connectivity established", ownerType: "Internal Tech Team", owner: "Engineering Team", dependencySide: "Internal", status: "COMPLETED" }),
-        act({ date: "2026-07-05", activityType: "BLOCKER", description: "Firewall rules blocking classification scans", ownerType: "DevOps", owner: "Axis Infra", dependencySide: "Client", requestedBy: "Ankur Katyarmal", requestedDate: "2026-07-05", expectedDate: "2026-07-08", receivedDate: "", status: "BLOCKED", impact: "Classification jobs cannot run" }),
-        act({ date: "2026-07-20", activityType: "DISCUSSION", description: "Escalation call with Axis IT leadership on firewall delay", ownerType: "Project / PM", owner: "Ankur", dependencySide: "Internal", status: "COMPLETED" }),
-        act({ date: "2026-08-01", activityType: "STATUS UPDATE", description: "Leadership briefing and delay timeline shared internally", ownerType: "Project / PM", owner: "Ankur", dependencySide: "Internal", status: "COMPLETED" })
+        act({ date: daysAgo(120), activityType: "MEETING", description: "Project kickoff and scoping", ownerType: "Project / PM", owner: "Ankur", status: "COMPLETED" }),
+        act({ date: daysAgo(108), activityType: "REQUEST", description: "Requested cluster port access list from Axis network team", ownerType: "Client", owner: "Axis Network Team", dependencySide: "Client", requestedBy: "Ankur Katyarmal", requestedDate: daysAgo(108), expectedDate: daysAgo(105), receivedDate: daysAgo(90), status: "RECEIVED", impact: "Delayed environment setup by 2 weeks" }),
+        act({ date: daysAgo(88), activityType: "ACTION", description: "Cluster connectivity established", ownerType: "Internal Tech Team", owner: "Engineering Team", status: "COMPLETED" }),
+        act({ date: daysAgo(75), activityType: "BLOCKER", description: "Firewall rules blocking classification scans", ownerType: "DevOps", owner: "Axis Infra", dependencySide: "Client", requestedBy: "Ankur Katyarmal", requestedDate: daysAgo(75), expectedDate: daysAgo(72), receivedDate: daysAgo(38), status: "RECEIVED", impact: "Classification jobs cannot run" }),
+        act({ date: daysAgo(60), activityType: "DISCUSSION", description: "Escalation call with Axis IT leadership on firewall delay", ownerType: "Project / PM", owner: "Ankur", status: "COMPLETED" }),
+        act({ date: daysAgo(41), activityType: "STATUS UPDATE", description: "Leadership briefing and delay timeline shared internally", ownerType: "Project / PM", owner: "Ankur", status: "COMPLETED" }),
+        act({ date: daysAgo(38), activityType: "ACTION", description: "Firewall exception approved; classification scans resumed", ownerType: "DevOps", owner: "Axis Infra", dependencySide: "Client", status: "COMPLETED", relatedPhase: "Integration" }),
+        act({ date: daysAgo(7), activityType: "ACTION", description: "Classification completed across all on-prem clusters", ownerType: "Internal Tech Team", owner: "Engineering Team", status: "COMPLETED", relatedPhase: "Build / Configuration" }),
+        act({ date: daysAgo(1), activityType: "STATUS UPDATE", description: "Final report review scheduled with Axis IT; go-live expected within target window", ownerType: "Project / PM", owner: "Ankur", status: "COMPLETED" })
       ],
       auditLog: [
-        { date: "2026-08-01", text: "Status changed: Blocked → In Progress" },
-        { date: "2026-07-05", text: "Status changed: In Progress → Blocked" }
+        { date: daysAgo(38), text: "Status changed: Blocked → In Progress" },
+        { date: daysAgo(75), text: "Status changed: In Progress → Blocked" }
       ],
       risks: [
         {
           id: generateId("risk"), category: "Schedule / Timeline",
-          description: "Two prior slippages (network access delay, firewall blocker) have already eaten into buffer — any further client-side delay puts the target completion date at risk.",
+          description: "Two prior slippages (network access delay, firewall blocker) had eaten into buffer — further client-side delay would have put the target completion date at risk.",
           likelihood: "High", impact: "Medium", riskScore: computeRiskScore("High", "Medium"),
-          status: "Mitigating", owner: "Ankur Katyarmal", mitigationPlan: "Weekly leadership sync with Axis IT already in place; tracking firewall/network readiness explicitly as a standing agenda item.",
-          identifiedDate: "2026-07-20", targetResolutionDate: "2026-08-15"
+          status: "Closed", owner: "Ankur Katyarmal", mitigationPlan: "Weekly leadership sync with Axis IT kept firewall/network readiness as a standing agenda item until resolved.",
+          identifiedDate: daysAgo(60), targetResolutionDate: daysAgo(35)
         }
       ]
     });
 
-    // 4. Nuvama — light activity
+    // 4. Nuvama — sandbox received, POC now actively underway
     projects.push({
       id: generateId("proj"),
       client: "Nuvama",
@@ -473,22 +496,25 @@ var Data = (function () {
       cloudProvider: "AWS",
       infrastructureOwnership: "Shared",
       owner: "Ankur",
-      startDate: "2026-07-28",
-      targetDate: "2026-09-10",
-      status: "planned",
+      startDate: daysAgo(50),
+      targetDate: daysFromNow(25),
+      status: "in-progress",
       health: "ON TRACK",
       modules: ["CGP"],
       description: "Initial CGP proof of concept for wealth management consent flows.",
       activities: [
-        act({ date: "2026-07-28", activityType: "MEETING", description: "Discovery call with Nuvama compliance team", ownerType: "Project / PM", owner: "Ankur", dependencySide: "Internal", status: "COMPLETED" }),
-        act({ date: "2026-08-10", activityType: "REQUEST", description: "Sandbox AWS account details requested", ownerType: "Client", owner: "Nuvama IT", dependencySide: "Client", requestedBy: "Ankur Katyarmal", requestedDate: "2026-08-10", expectedDate: "2026-08-17", receivedDate: "", status: "WAITING" })
+        act({ date: daysAgo(50), activityType: "MEETING", description: "Discovery call with Nuvama compliance team", ownerType: "Project / PM", owner: "Ankur", status: "COMPLETED" }),
+        act({ date: daysAgo(38), activityType: "REQUEST", description: "Sandbox AWS account details requested", ownerType: "Client", owner: "Nuvama IT", dependencySide: "Client", requestedBy: "Ankur Katyarmal", requestedDate: daysAgo(38), expectedDate: daysAgo(31), receivedDate: daysAgo(25), status: "RECEIVED" }),
+        act({ date: daysAgo(20), activityType: "ACTION", description: "Sandbox environment provisioned; CGP configuration started", status: "COMPLETED", relatedPhase: "Build / Configuration" }),
+        act({ date: daysAgo(3), activityType: "DISCUSSION", description: "Reviewed initial purpose taxonomy with Nuvama compliance team", ownerType: "Client", owner: "Nuvama Compliance", dependencySide: "Client", status: "COMPLETED" })
       ],
       auditLog: [
-        { date: "2026-07-28", text: "Project created" }
+        { date: daysAgo(20), text: "Status changed: Planned → In Progress" },
+        { date: daysAgo(50), text: "Project created" }
       ]
     });
 
-    // 5. ICICI Lombard — completed
+    // 5. ICICI Lombard — completed, stable in hypercare
     projects.push({
       id: generateId("proj"),
       client: "ICICI Lombard",
@@ -498,23 +524,24 @@ var Data = (function () {
       cloudProvider: "Azure",
       infrastructureOwnership: "Internal",
       owner: "Ankur",
-      startDate: "2026-05-01",
-      targetDate: "2026-07-15",
+      startDate: daysAgo(140),
+      targetDate: daysAgo(95),
       status: "completed",
       health: "ON TRACK",
       modules: ["Cookie Manager"],
       description: "Cookie Consent Manager implementation across policy microsites.",
       activities: [
-        act({ date: "2026-05-01", activityType: "MEETING", description: "Kickoff", ownerType: "Project / PM", owner: "Ankur", dependencySide: "Internal", status: "COMPLETED" }),
-        act({ date: "2026-06-10", activityType: "DEPLOYMENT", description: "Production deployment completed", ownerType: "Internal Tech Team", owner: "Engineering Team", dependencySide: "Internal", status: "COMPLETED" }),
-        act({ date: "2026-07-15", activityType: "PRODUCTION", description: "Go-live sign-off received", ownerType: "Client", owner: "ICICI Lombard IT", dependencySide: "Client", requestedBy: "Ankur Katyarmal", requestedDate: "2026-07-10", expectedDate: "2026-07-12", receivedDate: "2026-07-15", status: "RECEIVED" })
+        act({ date: daysAgo(140), activityType: "MEETING", description: "Kickoff", ownerType: "Project / PM", owner: "Ankur", status: "COMPLETED" }),
+        act({ date: daysAgo(129), activityType: "DEPLOYMENT", description: "Production deployment completed", ownerType: "Internal Tech Team", owner: "Engineering Team", status: "COMPLETED" }),
+        act({ date: daysAgo(95), activityType: "PRODUCTION", description: "Go-live sign-off received", ownerType: "Client", owner: "ICICI Lombard IT", dependencySide: "Client", requestedBy: "Ankur Katyarmal", requestedDate: daysAgo(100), expectedDate: daysAgo(98), receivedDate: daysAgo(95), status: "RECEIVED" }),
+        act({ date: daysAgo(10), activityType: "STATUS UPDATE", description: "Quarterly health check — no issues, consent capture rates stable", ownerType: "Project / PM", owner: "Ankur", status: "COMPLETED", relatedPhase: "Hypercare" })
       ],
       auditLog: [
-        { date: "2026-07-15", text: "Status changed: UAT → Completed" }
+        { date: daysAgo(95), text: "Status changed: UAT → Completed" }
       ]
     });
 
-    // 6. Alkem — backlog, minimal
+    // 6. Alkem — progressed from backlog into active scoping
     projects.push({
       id: generateId("proj"),
       client: "Alkem Laboratories",
@@ -524,21 +551,24 @@ var Data = (function () {
       cloudProvider: "",
       infrastructureOwnership: "Internal",
       owner: "Ankur",
-      startDate: "2026-08-08",
-      targetDate: "2026-09-30",
-      status: "backlog",
+      startDate: daysAgo(38),
+      targetDate: daysFromNow(45),
+      status: "planned",
       health: "ON TRACK",
       modules: ["DPIA"],
       description: "Data Protection Impact Assessment scoping for pharma distribution systems.",
       activities: [
-        act({ date: "2026-08-08", activityType: "REQUEST", description: "Initial scoping questionnaire sent to Alkem", ownerType: "Client", owner: "Alkem Compliance", dependencySide: "Client", requestedBy: "Ankur Katyarmal", requestedDate: "2026-08-08", expectedDate: "2026-08-18", receivedDate: "", status: "OPEN" })
+        act({ date: daysAgo(38), activityType: "REQUEST", description: "Initial scoping questionnaire sent to Alkem", ownerType: "Client", owner: "Alkem Compliance", dependencySide: "Client", requestedBy: "Ankur Katyarmal", requestedDate: daysAgo(38), expectedDate: daysAgo(28), receivedDate: daysAgo(15), status: "RECEIVED" }),
+        act({ date: daysAgo(12), activityType: "MEETING", description: "DPIA workshop conducted with Alkem compliance & pharma distribution teams", ownerType: "Client", owner: "Alkem Compliance", dependencySide: "Client", status: "COMPLETED" }),
+        act({ date: daysAgo(2), activityType: "DELIVERABLE", description: "Draft DPIA scope document shared for review", status: "COMPLETED", relatedPhase: "Discovery" })
       ],
       auditLog: [
-        { date: "2026-08-08", text: "Project created" }
+        { date: daysAgo(15), text: "Status changed: Backlog → Planned" },
+        { date: daysAgo(38), text: "Project created" }
       ]
     });
 
-    // 7. Adani — blocked
+    // 7. Adani — cloud sandbox fallback unblocked configuration work; on-prem still pending
     projects.push({
       id: generateId("proj"),
       client: "Adani",
@@ -548,31 +578,34 @@ var Data = (function () {
       cloudProvider: "",
       infrastructureOwnership: "Client",
       owner: "Ankur",
-      startDate: "2026-06-15",
-      targetDate: "2026-08-20",
-      status: "blocked",
-      health: "BLOCKED",
+      startDate: daysAgo(93),
+      targetDate: daysFromNow(20),
+      status: "in-progress",
+      health: "AT RISK",
       modules: ["TPRM", "Breach Management"],
       description: "Third-party risk management and breach workflow integration, on-prem deployment.",
       activities: [
-        act({ date: "2026-06-15", activityType: "MEETING", description: "Kickoff and architecture review", ownerType: "Project / PM", owner: "Ankur", dependencySide: "Internal", status: "COMPLETED" }),
-        act({ date: "2026-07-01", activityType: "REQUEST", description: "On-prem server provisioning requested", ownerType: "Client", owner: "Adani IT", dependencySide: "Client", requestedBy: "Ankur Katyarmal", requestedDate: "2026-07-01", expectedDate: "2026-07-10", receivedDate: "", status: "BLOCKED", impact: "Cannot begin installation without provisioned servers" })
+        act({ date: daysAgo(93), activityType: "MEETING", description: "Kickoff and architecture review", ownerType: "Project / PM", owner: "Ankur", status: "COMPLETED" }),
+        act({ date: daysAgo(77), activityType: "REQUEST", description: "On-prem server provisioning requested", ownerType: "Client", owner: "Adani IT", dependencySide: "Client", requestedBy: "Ankur Katyarmal", requestedDate: daysAgo(77), expectedDate: daysAgo(68), receivedDate: "", status: "BLOCKED", impact: "Cannot begin installation without provisioned servers" }),
+        act({ date: daysAgo(25), activityType: "ACTION", description: "Cloud sandbox fallback approved and provisioned; TPRM + Breach Management configuration started in parallel", status: "COMPLETED", relatedPhase: "Infrastructure Procurement", impact: "Unblocks configuration work while on-prem provisioning continues" }),
+        act({ date: daysAgo(4), activityType: "STATUS UPDATE", description: "On-prem servers still pending; sandbox-based configuration approximately 60% complete", ownerType: "Project / PM", owner: "Ankur", status: "COMPLETED" })
       ],
       auditLog: [
-        { date: "2026-07-15", text: "Status changed: Planned → Blocked" }
+        { date: daysAgo(25), text: "Status changed: Blocked → In Progress" },
+        { date: daysAgo(62), text: "Status changed: Planned → Blocked" }
       ],
       risks: [
         {
           id: generateId("risk"), category: "Operational / Infrastructure",
-          description: "On-prem server provisioning has been stalled for over a month with no firm date from Adani IT — installation cannot start at all until this resolves, and the POC window may lapse entirely.",
+          description: "On-prem server provisioning remains stalled with no firm date from Adani IT. A cloud sandbox fallback is keeping configuration work moving, but final deployment still depends on the on-prem environment landing before the POC window closes.",
           likelihood: "High", impact: "High", riskScore: computeRiskScore("High", "High"),
-          status: "Escalated", owner: "Ankur Katyarmal", mitigationPlan: "Escalated to Adani leadership; evaluating a temporary cloud sandbox as a fallback to keep the POC timeline alive while on-prem provisioning continues in parallel.",
-          identifiedDate: "2026-07-15", targetResolutionDate: "2026-08-05"
+          status: "Mitigating", owner: "Ankur Katyarmal", mitigationPlan: "Continuing configuration on the cloud sandbox in parallel; escalated on-prem timeline to Adani leadership with a revised target.",
+          identifiedDate: daysAgo(77), targetResolutionDate: daysFromNow(15)
         }
       ]
     });
 
-    // 8. Godrej — in progress, five connected assets
+    // 8. Godrej — all five assets classified, signed off and completed
     projects.push({
       id: generateId("proj"),
       client: "Godrej",
@@ -582,19 +615,57 @@ var Data = (function () {
       cloudProvider: "GCP",
       infrastructureOwnership: "Shared",
       owner: "Ankur",
-      startDate: "2026-06-20",
-      targetDate: "2026-09-05",
-      status: "in-progress",
-      health: "AT RISK",
+      startDate: daysAgo(88),
+      targetDate: daysAgo(8),
+      status: "completed",
+      health: "ON TRACK",
       modules: ["Data Compass"],
       description: "Classification rollout across five connected data assets for Godrej group entities.",
       activities: [
-        act({ date: "2026-06-20", activityType: "MEETING", description: "Kickoff — five connected assets scoped", ownerType: "Project / PM", owner: "Ankur", dependencySide: "Internal", status: "COMPLETED" }),
-        act({ date: "2026-07-18", activityType: "ACTION", description: "Classification completed on 3 of 5 assets", ownerType: "Internal Tech Team", owner: "Engineering Team", dependencySide: "Internal", status: "COMPLETED" }),
-        act({ date: "2026-08-05", activityType: "REQUEST", description: "Access credentials requested for remaining 2 assets", ownerType: "Client", owner: "Godrej IT", dependencySide: "Client", requestedBy: "Ankur Katyarmal", requestedDate: "2026-08-05", expectedDate: "2026-08-09", receivedDate: "", status: "WAITING" })
+        act({ date: daysAgo(88), activityType: "MEETING", description: "Kickoff — five connected assets scoped", ownerType: "Project / PM", owner: "Ankur", status: "COMPLETED" }),
+        act({ date: daysAgo(60), activityType: "ACTION", description: "Classification completed on 3 of 5 assets", ownerType: "Internal Tech Team", owner: "Engineering Team", status: "COMPLETED" }),
+        act({ date: daysAgo(43), activityType: "REQUEST", description: "Access credentials requested for remaining 2 assets", ownerType: "Client", owner: "Godrej IT", dependencySide: "Client", requestedBy: "Ankur Katyarmal", requestedDate: daysAgo(43), expectedDate: daysAgo(39), receivedDate: daysAgo(30), status: "RECEIVED" }),
+        act({ date: daysAgo(28), activityType: "ACTION", description: "Classification completed on remaining 2 assets — all 5 connected assets now classified", ownerType: "Internal Tech Team", owner: "Engineering Team", status: "COMPLETED" }),
+        act({ date: daysAgo(9), activityType: "PRODUCTION", description: "Final classification report delivered and signed off by Godrej data governance team", ownerType: "Client", owner: "Godrej IT", dependencySide: "Client", status: "RECEIVED", relatedPhase: "Go-Live" })
       ],
       auditLog: [
-        { date: "2026-08-05", text: "Dependency added: Godrej IT — access credentials" }
+        { date: daysAgo(9), text: "Status changed: In Progress → Completed" },
+        { date: daysAgo(43), text: "Dependency added: Godrej IT — access credentials" }
+      ]
+    });
+
+    // 9. Bajaj Allianz — brand-new engagement, kicked off in the last few days
+    projects.push({
+      id: generateId("proj"),
+      client: "Bajaj Allianz",
+      projectName: "Cookie & Consent Compliance POC",
+      projectType: "POC",
+      environment: "Cloud",
+      cloudProvider: "Azure",
+      infrastructureOwnership: "Shared",
+      owner: "Ankur",
+      startDate: daysAgo(4),
+      targetDate: daysFromNow(50),
+      status: "planned",
+      health: "ON TRACK",
+      modules: ["CGP", "Cookie Manager"],
+      description: "Cookie consent scanning and Consent Governance Platform POC for Bajaj Allianz's policy issuance microsites.",
+      activities: [
+        act({ date: daysAgo(4), activityType: "MEETING", description: "Kickoff call — scoping Cookie Manager + CGP for policy microsites", ownerType: "Project / PM", owner: "Ankur", status: "COMPLETED", relatedPhase: "Kickoff" }),
+        act({ date: daysAgo(3), activityType: "DELIVERABLE", description: "Shared POC pre-requisites — API guide, cookie scan methodology, sample taxonomy", status: "COMPLETED", relatedPhase: "Prerequisites" }),
+        act({ date: daysAgo(1), activityType: "REQUEST", description: "Requested domain access and admin user details for cookie scan", ownerType: "Client", owner: "Bajaj Allianz IT", dependencySide: "Client", requestedBy: "Ankur Katyarmal", requestedDate: daysAgo(1), expectedDate: daysFromNow(4), receivedDate: "", status: "WAITING", relatedPhase: "Prerequisites" })
+      ],
+      auditLog: [
+        { date: daysAgo(4), text: "Project created" }
+      ],
+      risks: [
+        {
+          id: generateId("risk"), category: "Vendor / Third-Party",
+          description: "Bajaj Allianz runs a multi-vendor microsite setup with a third-party CMS — cookie scan coverage may be incomplete without cooperation from their web vendor.",
+          likelihood: "Medium", impact: "Medium", riskScore: computeRiskScore("Medium", "Medium"),
+          status: "Open", owner: "Ankur Katyarmal", mitigationPlan: "Request the web vendor's contact early; scope a phased scan starting with primary domains.",
+          identifiedDate: daysAgo(3), targetResolutionDate: daysFromNow(10)
+        }
       ]
     });
 
