@@ -353,6 +353,7 @@ var App = (function () {
     if (state.page === "projects") return renderProjectsPage(main);
     if (state.page === "timeline") return renderTimelinePage(main);
     if (state.page === "analytics") return renderAnalyticsPage(main);
+    if (state.page === "risks") return renderRisksPage(main);
     if (state.page === "reports") return renderReportsPage(main);
     if (state.page === "approvals") return renderApprovalsPage(main);
     if (state.page === "access") return renderAccessPage(main);
@@ -378,10 +379,17 @@ var App = (function () {
     var inProgress = projects.filter(function (p) { return p.status === "in-progress"; }).length;
 
     var clientWaiting = 0, internalWaiting = 0, activeWork = 0, totalElapsed = 0;
+    var openRisks = 0, criticalRisks = 0;
     projects.forEach(function (p) {
       var a = Data.calcProjectAnalytics(p);
       clientWaiting += a.clientWaiting; internalWaiting += a.internalWaiting;
       activeWork += a.activeWork; totalElapsed += a.totalElapsed;
+      (p.risks || []).forEach(function (r) {
+        if (r.status !== "Closed") {
+          openRisks++;
+          if (r.riskScore === "Critical") criticalRisks++;
+        }
+      });
     });
 
     function statCard(label, value, cls) {
@@ -410,6 +418,11 @@ var App = (function () {
     html += statCard("Internal Waiting (days)", internalWaiting, "stat-mono");
     html += statCard("Active Work (days)", activeWork, "stat-mono");
     html += statCard("Total Elapsed (days)", totalElapsed, "stat-mono");
+    html += "</div>";
+
+    html += '<div class="stat-grid stat-grid-secondary">';
+    html += statCard("Open Risks", openRisks, "stat-amber");
+    html += statCard("Critical Risks", criticalRisks, "stat-red");
     html += "</div>";
 
     html += '<div class="section-title">At a Glance — Kanban</div><div id="dashboardKanban"></div>';
@@ -538,6 +551,34 @@ var App = (function () {
     html += '<div id="analyticsContainer"></div>';
     main.innerHTML = html;
     Analytics.render($("#analyticsContainer"), state.projects);
+  }
+
+  // ---------------------------------------------------------------- risks page (portfolio-wide)
+  function renderRisksPage(main) {
+    var html = '<div class="page-header"><h1>Risks</h1><p class="page-subtitle">Risk register across every project, most severe first</p></div>';
+    html += scopedViewBanner();
+    html += '<div class="filter-bar">';
+    html += '<select id="riskCategory"><option value="All">All categories</option>' + Data.RISK_CATEGORIES.map(function (c) { return '<option value="' + esc(c) + '">' + esc(c) + "</option>"; }).join("") + "</select>";
+    html += '<select id="riskStatus"><option value="All">All statuses</option>' + Data.RISK_STATUSES.map(function (s) { return '<option value="' + esc(s) + '">' + esc(s) + "</option>"; }).join("") + "</select>";
+    html += '<select id="riskScore"><option value="All">All scores</option>' + ["Critical", "High", "Medium", "Low"].map(function (s) { return '<option value="' + esc(s) + '">' + esc(s) + "</option>"; }).join("") + "</select>";
+    html += '<select id="riskProject"><option value="All">All projects</option>' + state.projects.map(function (p) { return '<option value="' + p.id + '">' + esc(p.client) + " — " + esc(p.projectName) + "</option>"; }).join("") + "</select>";
+    html += '<button class="btn btn-ghost btn-sm" id="btnClearRiskFilters">Clear filters</button></div>';
+    html += '<div id="riskContainer"></div>';
+    main.innerHTML = html;
+
+    function apply() {
+      var filters = {
+        category: $("#riskCategory").value, status: $("#riskStatus").value,
+        score: $("#riskScore").value, project: $("#riskProject").value
+      };
+      Risks.renderPortfolioRisks($("#riskContainer"), state.projects, filters);
+    }
+    ["riskCategory", "riskStatus", "riskScore", "riskProject"].forEach(function (id) { $("#" + id).addEventListener("change", apply); });
+    $("#btnClearRiskFilters").addEventListener("click", function () {
+      ["riskCategory", "riskStatus", "riskScore", "riskProject"].forEach(function (id) { $("#" + id).value = "All"; });
+      apply();
+    });
+    apply();
   }
 
   // ---------------------------------------------------------------- reports page
@@ -826,7 +867,8 @@ var App = (function () {
   // ---------------------------------------------------------------- approvals (maker-checker)
   var CHANGE_TYPE_LABELS = {
     create_project: "New Project", edit_project: "Edit Project", delete_project: "Delete Project",
-    add_activity: "Add Activity", edit_activity: "Edit Activity", delete_activity: "Delete Activity"
+    add_activity: "Add Activity", edit_activity: "Edit Activity", delete_activity: "Delete Activity",
+    add_risk: "Add Risk", edit_risk: "Edit Risk", delete_risk: "Delete Risk"
   };
 
   function describeChangePayload(change) {
@@ -838,6 +880,10 @@ var App = (function () {
     }
     if (change.type === "delete_activity") return "Delete: " + esc(change.payload.description);
     if (change.type === "delete_project") return "Delete this project and all its activity history";
+    if (change.type === "add_risk" || change.type === "edit_risk") {
+      return esc(change.payload.category) + " (" + esc(change.payload.riskScore) + ") — " + esc(change.payload.description);
+    }
+    if (change.type === "delete_risk") return "Delete: " + esc(change.payload.description);
     return "";
   }
 
@@ -876,6 +922,21 @@ var App = (function () {
     } else if (change.type === "delete_activity") {
       project.activities = (project.activities || []).filter(function (a) { return a.id !== change.payload.activityId; });
       addAudit(project, "Activity deletion approved (proposed by " + change.submittedByName + "): " + change.payload.description);
+      persistProject(project);
+    } else if (change.type === "add_risk") {
+      project.risks = project.risks || [];
+      var risk = Object.assign({}, change.payload, { id: Data.generateId("risk") });
+      project.risks.push(risk);
+      addAudit(project, "Risk added (approved from " + change.submittedByName + "'s proposal): " + risk.description);
+      persistProject(project);
+    } else if (change.type === "edit_risk") {
+      var targetRisk = (project.risks || []).filter(function (r) { return r.id === change.payload.riskId; })[0];
+      if (targetRisk) Object.assign(targetRisk, change.payload);
+      addAudit(project, "Risk edit approved (proposed by " + change.submittedByName + ")");
+      persistProject(project);
+    } else if (change.type === "delete_risk") {
+      project.risks = (project.risks || []).filter(function (r) { return r.id !== change.payload.riskId; });
+      addAudit(project, "Risk deletion approved (proposed by " + change.submittedByName + "): " + change.payload.description);
       persistProject(project);
     }
   }
@@ -1090,8 +1151,18 @@ var App = (function () {
       poc: projects.filter(function (p) { return p.projectType === "POC"; }).length,
       blocked: state.projects.filter(function (p) { return p.status === "blocked"; }).length,
       atRisk: state.projects.filter(function (p) { return p.health === "AT RISK"; }).length,
-      inProgress: state.projects.filter(function (p) { return p.status === "in-progress"; }).length
+      inProgress: state.projects.filter(function (p) { return p.status === "in-progress"; }).length,
+      openRisks: 0,
+      criticalRisks: 0
     };
+    state.projects.forEach(function (p) {
+      (p.risks || []).forEach(function (r) {
+        if (r.status !== "Closed") {
+          stats.openRisks++;
+          if (r.riskScore === "Critical") stats.criticalRisks++;
+        }
+      });
+    });
     return { stats: stats, projects: projects };
   }
 
@@ -1302,6 +1373,11 @@ var App = (function () {
     html += Timeline.renderProjectTimeline(project, canDirect, canPropose);
     html += "</div>";
 
+    html += '<div class="drawer-section"><div class="drawer-section-title-row"><div class="drawer-section-title">Risk Register</div>' +
+      ((canDirect || canPropose) ? '<button class="btn btn-primary btn-sm" id="btnAddRisk">' + (canDirect ? "+ Add Risk" : "+ Propose Risk") + '</button>' : "") + "</div>";
+    html += Risks.renderProjectRisks(project, canDirect, canPropose);
+    html += "</div>";
+
     html += '<div class="drawer-section"><div class="drawer-section-title">Activity Log</div><div class="audit-log">';
     if (!project.auditLog || !project.auditLog.length) {
       html += '<div class="empty-state">No log entries yet.</div>';
@@ -1326,6 +1402,10 @@ var App = (function () {
       if (addActBtn) addActBtn.addEventListener("click", function () { openActivityForm(project.id, null); });
       $all("[data-edit-activity]").forEach(function (btn) { btn.addEventListener("click", function () { openActivityForm(project.id, btn.getAttribute("data-edit-activity")); }); });
       $all("[data-delete-activity]").forEach(function (btn) { btn.addEventListener("click", function () { confirmDeleteActivity(project.id, btn.getAttribute("data-delete-activity")); }); });
+      var addRiskBtn = $("#btnAddRisk");
+      if (addRiskBtn) addRiskBtn.addEventListener("click", function () { openRiskForm(project.id, null); });
+      $all("[data-edit-risk]").forEach(function (btn) { btn.addEventListener("click", function () { openRiskForm(project.id, btn.getAttribute("data-edit-risk")); }); });
+      $all("[data-delete-risk]").forEach(function (btn) { btn.addEventListener("click", function () { confirmDeleteRisk(project.id, btn.getAttribute("data-delete-risk")); }); });
     }
     if (p2.download) {
       var repBtn = $("#btnDownloadProjectReport");
@@ -1614,6 +1694,113 @@ var App = (function () {
     if (!confirm('Delete activity "' + activity.description + '"? This cannot be undone.')) return;
     project.activities = project.activities.filter(function (a) { return a.id !== activityId; });
     addAudit(project, "Activity deleted: " + activity.description);
+    persistProject(project);
+    renderDrawer();
+  }
+
+  // ---------------------------------------------------------------- risk register (add/edit/delete)
+  function openRiskForm(projectId, riskId) {
+    var project = findProject(projectId);
+    if (!project) return;
+    var proposing = isProposing();
+    if (!canEditProject(project) && !proposing) return alert("You don't have edit access to this project.");
+
+    var risk = riskId ? (project.risks || []).filter(function (r) { return r.id === riskId; })[0] : null;
+    var isEdit = !!risk;
+    risk = risk || {
+      category: "Technical", description: "", likelihood: "Medium", impact: "Medium",
+      status: "Open", owner: "", mitigationPlan: "",
+      identifiedDate: Data.todayStr(), targetResolutionDate: ""
+    };
+
+    var html = '<div class="modal-header"><h2>' + (proposing ? (isEdit ? "Propose Edit — Risk" : "Propose Risk") : (isEdit ? "Edit Risk" : "Add Risk")) + '</h2><button class="drawer-close" id="modalCloseBtn">&times;</button></div>';
+    html += '<form id="riskForm" class="form-grid">';
+    html += formField("Category", selectHtml("r_category", Data.RISK_CATEGORIES, risk.category, true));
+    html += formField("Status", selectHtml("r_status", Data.RISK_STATUSES, risk.status, true));
+    html += formField("Description", '<textarea id="r_description" rows="2">' + esc(risk.description) + "</textarea>", null, true);
+    html += formField("Likelihood", selectHtml("r_likelihood", Data.RISK_LEVELS, risk.likelihood, true));
+    html += formField("Impact", selectHtml("r_impact", Data.RISK_LEVELS, risk.impact, true));
+    html += '<div class="form-field"><label>Risk Score</label><div id="r_scorePreview" class="risk-score-preview"></div></div>';
+    html += formField("Owner", '<input type="text" id="r_owner" list="teamNamesList" value="' + esc(risk.owner) + '">');
+    html += formField("Identified Date", '<input type="date" id="r_identifiedDate" value="' + esc(risk.identifiedDate) + '">');
+    html += formField("Target Resolution Date", '<input type="date" id="r_targetResolutionDate" value="' + esc(risk.targetResolutionDate) + '">');
+    html += formField("Mitigation Plan", '<textarea id="r_mitigationPlan" rows="2">' + esc(risk.mitigationPlan) + "</textarea>", null, true);
+    html += '<datalist id="teamNamesList">' + teamDirectoryNames().map(function (n) { return '<option value="' + esc(n) + '">'; }).join("") + "</datalist>";
+    if (proposing) html += '<div class="form-field form-field-full"><div class="empty-state">This will be submitted for approval — nothing changes live until an admin or the project owner approves it.</div></div>';
+    html += '<div class="form-actions"><button type="button" class="btn btn-ghost" id="btnCancelRisk">Cancel</button><button type="submit" class="btn btn-primary">' + (proposing ? "Submit for Approval" : "Save Risk") + "</button></div>";
+    html += "</form>";
+    openModal(html);
+
+    function updateScorePreview() {
+      var score = Data.computeRiskScore($("#r_likelihood").value, $("#r_impact").value);
+      $("#r_scorePreview").innerHTML = '<span class="pill ' + Risks.scorePillClass(score) + '">' + score + "</span>";
+    }
+    $("#r_likelihood").addEventListener("change", updateScorePreview);
+    $("#r_impact").addEventListener("change", updateScorePreview);
+    updateScorePreview();
+
+    $("#modalCloseBtn").addEventListener("click", closeModal);
+    $("#btnCancelRisk").addEventListener("click", closeModal);
+
+    $("#riskForm").addEventListener("submit", function (e) {
+      e.preventDefault();
+      var likelihood = $("#r_likelihood").value, impact = $("#r_impact").value;
+      var payload = {
+        category: $("#r_category").value, status: $("#r_status").value,
+        description: $("#r_description").value.trim(), likelihood: likelihood, impact: impact,
+        riskScore: Data.computeRiskScore(likelihood, impact), owner: $("#r_owner").value.trim(),
+        identifiedDate: $("#r_identifiedDate").value, targetResolutionDate: $("#r_targetResolutionDate").value,
+        mitigationPlan: $("#r_mitigationPlan").value.trim()
+      };
+
+      if (proposing) {
+        if (isEdit) payload.riskId = risk.id;
+        Auth.submitPendingChange({
+          type: isEdit ? "edit_risk" : "add_risk",
+          targetProjectId: project.id,
+          targetOwnerEmail: project.ownerEmail || null,
+          clientLabel: project.client + " — " + project.projectName,
+          payload: payload
+        }).then(function () {
+          closeModal();
+          alert("Submitted for approval.");
+        }).catch(function (err) { alert("Couldn't submit: " + err.message); });
+        return;
+      }
+
+      project.risks = project.risks || [];
+      if (isEdit) { Object.assign(risk, payload); addAudit(project, "Risk updated: " + payload.description); }
+      else { payload.id = Data.generateId("risk"); project.risks.push(payload); addAudit(project, "Risk added: " + payload.description); }
+      persistProject(project);
+      closeModal();
+      renderDrawer();
+      if (["risks", "dashboard"].indexOf(state.page) !== -1) renderPage();
+    });
+  }
+
+  function confirmDeleteRisk(projectId, riskId) {
+    var project = findProject(projectId);
+    if (!project) return;
+    var proposing = isProposing();
+    if (!canEditProject(project) && !proposing) return alert("You don't have edit access to this project.");
+    var risk = (project.risks || []).filter(function (r) { return r.id === riskId; })[0];
+    if (!risk) return;
+
+    if (proposing) {
+      if (!confirm('Propose deleting risk "' + risk.description + '"? This will be sent for approval.')) return;
+      Auth.submitPendingChange({
+        type: "delete_risk",
+        targetProjectId: project.id,
+        targetOwnerEmail: project.ownerEmail || null,
+        clientLabel: project.client + " — " + project.projectName,
+        payload: { riskId: riskId, description: risk.description }
+      }).then(function () { alert("Deletion proposed — awaiting approval."); });
+      return;
+    }
+
+    if (!confirm('Delete risk "' + risk.description + '"? This cannot be undone.')) return;
+    project.risks = project.risks.filter(function (r) { return r.id !== riskId; });
+    addAudit(project, "Risk deleted: " + risk.description);
     persistProject(project);
     renderDrawer();
   }

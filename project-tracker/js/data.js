@@ -108,6 +108,36 @@ var Data = (function () {
     "No response from client"
   ];
 
+  // -- risk register --------------------------------------------------
+  var RISK_CATEGORIES = [
+    "Technical",
+    "Schedule / Timeline",
+    "Resource",
+    "Client / Stakeholder",
+    "Vendor / Third-Party",
+    "Compliance / Regulatory",
+    "Security",
+    "Commercial / Financial",
+    "Operational / Infrastructure",
+    "Quality",
+    "Scope",
+    "Communication"
+  ];
+  var RISK_LEVELS = ["Low", "Medium", "High"];
+  var RISK_STATUSES = ["Open", "Mitigating", "Escalated", "Closed", "Accepted"];
+
+  // Standard 3x3 likelihood x impact matrix -> Low/Medium/High/Critical.
+  var RISK_SCORE_MATRIX = {
+    "Low|Low": "Low", "Low|Medium": "Low", "Low|High": "Medium",
+    "Medium|Low": "Low", "Medium|Medium": "Medium", "Medium|High": "High",
+    "High|Low": "Medium", "High|Medium": "High", "High|High": "Critical"
+  };
+  function computeRiskScore(likelihood, impact) {
+    return RISK_SCORE_MATRIX[likelihood + "|" + impact] || "Medium";
+  }
+  // Sort order for showing the most severe risks first.
+  var RISK_SCORE_RANK = { "Critical": 3, "High": 2, "Medium": 1, "Low": 0 };
+
   // Starter team directory seeded from the real PMO Weekly Program
   // Bulletin's Owner / Pre-Sales & Sales Team columns. Editable by an admin
   // in Settings — this is just a reasonable starting point, not gospel.
@@ -351,6 +381,15 @@ var Data = (function () {
         { date: "2026-08-14", text: "Status changed: In Progress → Blocked" },
         { date: "2026-08-14", text: "Dependency added: HSBC DevOps — API encryption confirmation" },
         { date: "2026-08-12", text: "Status changed: Planned → In Progress" }
+      ],
+      risks: [
+        {
+          id: generateId("risk"), category: "Vendor / Third-Party",
+          description: "HSBC DevOps has been slow to respond on infrastructure deployment and API encryption confirmation — pattern suggests possible resourcing constraints on their side.",
+          likelihood: "Medium", impact: "High", riskScore: computeRiskScore("Medium", "High"),
+          status: "Open", owner: "Ankur Katyarmal", mitigationPlan: "Escalate via weekly steering call; propose a dedicated HSBC DevOps point of contact for the remainder of deployment.",
+          identifiedDate: "2026-08-14", targetResolutionDate: "2026-08-21"
+        }
       ]
     });
 
@@ -412,6 +451,15 @@ var Data = (function () {
       auditLog: [
         { date: "2026-08-01", text: "Status changed: Blocked → In Progress" },
         { date: "2026-07-05", text: "Status changed: In Progress → Blocked" }
+      ],
+      risks: [
+        {
+          id: generateId("risk"), category: "Schedule / Timeline",
+          description: "Two prior slippages (network access delay, firewall blocker) have already eaten into buffer — any further client-side delay puts the target completion date at risk.",
+          likelihood: "High", impact: "Medium", riskScore: computeRiskScore("High", "Medium"),
+          status: "Mitigating", owner: "Ankur Katyarmal", mitigationPlan: "Weekly leadership sync with Axis IT already in place; tracking firewall/network readiness explicitly as a standing agenda item.",
+          identifiedDate: "2026-07-20", targetResolutionDate: "2026-08-15"
+        }
       ]
     });
 
@@ -512,6 +560,15 @@ var Data = (function () {
       ],
       auditLog: [
         { date: "2026-07-15", text: "Status changed: Planned → Blocked" }
+      ],
+      risks: [
+        {
+          id: generateId("risk"), category: "Operational / Infrastructure",
+          description: "On-prem server provisioning has been stalled for over a month with no firm date from Adani IT — installation cannot start at all until this resolves, and the POC window may lapse entirely.",
+          likelihood: "High", impact: "High", riskScore: computeRiskScore("High", "High"),
+          status: "Escalated", owner: "Ankur Katyarmal", mitigationPlan: "Escalated to Adani leadership; evaluating a temporary cloud sandbox as a fallback to keep the POC timeline alive while on-prem provisioning continues in parallel.",
+          identifiedDate: "2026-07-15", targetResolutionDate: "2026-08-05"
+        }
       ]
     });
 
@@ -562,6 +619,11 @@ var Data = (function () {
     DEPENDENCY_SIDES: DEPENDENCY_SIDES,
     ACTIVITY_STATUSES: ACTIVITY_STATUSES,
     generateId: generateId,
+    RISK_CATEGORIES: RISK_CATEGORIES,
+    RISK_LEVELS: RISK_LEVELS,
+    RISK_STATUSES: RISK_STATUSES,
+    RISK_SCORE_RANK: RISK_SCORE_RANK,
+    computeRiskScore: computeRiskScore,
     statusKeyFromLabel: statusKeyFromLabel,
     statusLabelFromKey: statusLabelFromKey,
     fuzzyMatch: fuzzyMatch,

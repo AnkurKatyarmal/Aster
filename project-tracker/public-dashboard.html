@@ -117,6 +117,10 @@
     html += statCard("At Risk", s.atRisk || 0, "stat-amber");
     html += statCard("In Progress", s.inProgress || 0);
     html += "</div>";
+    html += '<div class="stat-grid" style="grid-template-columns:repeat(2,minmax(160px,240px));margin-top:-14px;">';
+    html += statCard("Open Risks", s.openRisks || 0, "stat-amber");
+    html += statCard("Critical Risks", s.criticalRisks || 0, "stat-red");
+    html += "</div>";
 
     html += '<div class="table-wrap"><table><thead><tr><th>Client</th><th>Project</th><th>Type</th><th>Modules</th><th>Status</th><th>Health</th><th>Progress</th><th>Owner</th></tr></thead><tbody>';
     (data.projects || []).forEach(function (p, i) {
