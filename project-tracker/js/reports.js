@@ -57,6 +57,10 @@ var Reports = (function () {
       ".rp-badge{display:inline-block;font-size:9.5px;font-weight:700;padding:2px 7px;border-radius:10px;text-transform:uppercase;}",
       ".rp-badge-live{background:#E6F4EB;color:#1F8A4C;}",
       ".rp-badge-poc{background:#EEEDFB;color:#5B4FCF;}",
+      ".rp-badge-critical{background:" + BRAND.red + ";color:#fff;}",
+      ".rp-badge-high{background:#FBEAEA;color:" + BRAND.red + ";}",
+      ".rp-badge-medium{background:#FBF3DF;color:#A9720B;}",
+      ".rp-badge-low{background:#E6F4EB;color:#1F8A4C;}",
       ".rp-stat-row{display:flex;gap:14px;margin-bottom:16px;flex-wrap:wrap;}",
       ".rp-stat{border:1px solid #E3E6EE;border-radius:6px;padding:10px 16px;text-align:center;min-width:110px;}",
       ".rp-stat-value{font-size:20px;font-weight:700;color:" + BRAND.navy + ";}",
@@ -125,6 +129,25 @@ var Reports = (function () {
     }
     html += "</div>";
 
+    html += "<div class='rp-section'><div class='rp-section-title'>Risk Register</div>";
+    var risks = sortRisksBySeverity(project.risks || []);
+    if (!risks.length) {
+      html += "<div class='rp-empty'>No risks logged.</div>";
+    } else {
+      html += "<table class='rp-table'><thead><tr><th>Score</th><th>Category</th><th>Description</th><th>Status</th><th>Owner</th><th>Target</th></tr></thead><tbody>";
+      risks.forEach(function (r) {
+        html += "<tr><td><span class='rp-badge " + riskBadgeClass(r.riskScore) + "'>" + esc(r.riskScore) + "</span></td>" +
+          "<td>" + esc(r.category) + "</td><td>" + esc(r.description) + "</td>" +
+          "<td>" + esc(r.status) + "</td><td>" + esc(r.owner || "—") + "</td>" +
+          "<td>" + (r.targetResolutionDate ? Data.formatDate(r.targetResolutionDate) : "—") + "</td></tr>";
+        if (r.mitigationPlan) {
+          html += "<tr><td></td><td colspan='5' style='font-size:11px;color:#666;padding-top:0;'><em>Mitigation: " + esc(r.mitigationPlan) + "</em></td></tr>";
+        }
+      });
+      html += "</tbody></table>";
+    }
+    html += "</div>";
+
     html += "<div class='rp-section'><div class='rp-section-title'>Activity Timeline</div>";
     var activities = (project.activities || []).slice().sort(function (x, y) { return (x.date || "").localeCompare(y.date || ""); });
     if (!activities.length) {
@@ -150,6 +173,19 @@ var Reports = (function () {
   }
   function gridItem(label, value) {
     return "<div><span class='rp-label'>" + label + "</span><span class='rp-value'>" + (typeof value === "string" && value.indexOf("<") === 0 ? value : esc(value)) + "</span></div>";
+  }
+  function riskBadgeClass(score) {
+    if (score === "Critical") return "rp-badge-critical";
+    if (score === "High") return "rp-badge-high";
+    if (score === "Medium") return "rp-badge-medium";
+    return "rp-badge-low";
+  }
+  function sortRisksBySeverity(risks) {
+    return risks.slice().sort(function (a, b) {
+      var rankDiff = (Data.RISK_SCORE_RANK[b.riskScore] || 0) - (Data.RISK_SCORE_RANK[a.riskScore] || 0);
+      if (rankDiff !== 0) return rankDiff;
+      return (a.targetResolutionDate || "").localeCompare(b.targetResolutionDate || "");
+    });
   }
 
   // -------------------------------------------------- weekly status report
@@ -239,6 +275,63 @@ var Reports = (function () {
     return "<ul class='rp-list'>" + items.map(function (i) { return "<li>" + esc(i) + "</li>"; }).join("") + "</ul>";
   }
 
+  // -------------------------------------------------- portfolio-wide risk report
+  function allRisksReport(projects) {
+    var win = shellOpen("Risk Register — All Projects");
+    if (!win) return;
+
+    var rows = [];
+    projects.forEach(function (p) {
+      (p.risks || []).forEach(function (r) { rows.push({ project: p, risk: r }); });
+    });
+    rows.sort(function (a, b) {
+      var rankDiff = (Data.RISK_SCORE_RANK[b.risk.riskScore] || 0) - (Data.RISK_SCORE_RANK[a.risk.riskScore] || 0);
+      if (rankDiff !== 0) return rankDiff;
+      return (a.risk.targetResolutionDate || "").localeCompare(b.risk.targetResolutionDate || "");
+    });
+
+    var openRows = rows.filter(function (r) { return r.risk.status !== "Closed"; });
+    var counts = { Critical: 0, High: 0, Medium: 0, Low: 0 };
+    openRows.forEach(function (r) { counts[r.risk.riskScore] = (counts[r.risk.riskScore] || 0) + 1; });
+
+    var html = "";
+    html += "<div class='rp-header'>" +
+      "<div><div class='rp-brand'>Ankur's Project Tracker</div><div class='rp-brand-sub'>Risk Register — All Projects</div>" +
+      "<h1 class='rp-title'>Portfolio Risk Register</h1></div>" +
+      "<div class='rp-meta'>Generated " + Data.formatDate(Data.todayStr()) + "</div>" +
+      "</div>";
+
+    html += "<div class='rp-stat-row'>";
+    html += statBlock("Open Risks", openRows.length);
+    html += statBlock("Critical", counts.Critical);
+    html += statBlock("High", counts.High);
+    html += statBlock("Medium", counts.Medium);
+    html += statBlock("Low", counts.Low);
+    html += "</div>";
+
+    html += "<div class='rp-section'><div class='rp-section-title'>All Risks (most severe first)</div>";
+    if (!rows.length) {
+      html += "<div class='rp-empty'>No risks logged across any project.</div>";
+    } else {
+      html += "<table class='rp-table'><thead><tr><th>Score</th><th>Client</th><th>Project</th><th>Category</th><th>Description</th><th>Status</th><th>Owner</th><th>Target</th></tr></thead><tbody>";
+      rows.forEach(function (r) {
+        html += "<tr><td><span class='rp-badge " + riskBadgeClass(r.risk.riskScore) + "'>" + esc(r.risk.riskScore) + "</span></td>" +
+          "<td>" + esc(r.project.client) + "</td><td>" + esc(r.project.projectName) + "</td>" +
+          "<td>" + esc(r.risk.category) + "</td><td>" + esc(r.risk.description) + "</td>" +
+          "<td>" + esc(r.risk.status) + "</td><td>" + esc(r.risk.owner || "—") + "</td>" +
+          "<td>" + (r.risk.targetResolutionDate ? Data.formatDate(r.risk.targetResolutionDate) : "—") + "</td></tr>";
+        if (r.risk.mitigationPlan) {
+          html += "<tr><td></td><td colspan='7' style='font-size:11px;color:#666;padding-top:0;'><em>Mitigation: " + esc(r.risk.mitigationPlan) + "</em></td></tr>";
+        }
+      });
+      html += "</tbody></table>";
+    }
+    html += "</div>";
+
+    win.document.getElementById("reportRoot").innerHTML = html;
+    setTimeout(function () { try { win.focus(); } catch (e) {} }, 300);
+  }
+
   function pocKickoffReport(f) {
     var win = shellOpen("POC Kickoff — " + f.client);
     if (!win) return;
@@ -306,5 +399,5 @@ var Reports = (function () {
     setTimeout(function () { try { win.focus(); } catch (e) {} }, 300);
   }
 
-  return { projectReport: projectReport, weeklyReport: weeklyReport, pocKickoffReport: pocKickoffReport, pocCompletionReport: pocCompletionReport };
+  return { projectReport: projectReport, weeklyReport: weeklyReport, allRisksReport: allRisksReport, pocKickoffReport: pocKickoffReport, pocCompletionReport: pocCompletionReport };
 })();
